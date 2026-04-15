@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-slasher",
+  "name": "Slasher",
+  "version": "0.1.0",
+  "minAppVersion": "1.6.0",
+  "description": "Create custom slash commands that insert rendered template output into the editor.",
+  "author": "binnyva",
+  "isDesktopOnly": true
+}

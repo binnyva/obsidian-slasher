@@ -1,0 +1,28 @@
+{
+  "name": "obsidian-slasher",
+  "version": "0.1.0",
+  "description": "Custom slash commands for Obsidian powered by template strings.",
+  "main": "main.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "dev-deploy": "npm run build && node scripts/dev-deploy.mjs",
+    "test": "node --import tsx --test test/**/*.test.ts"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin"
+  ],
+  "author": "binnyva",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "esbuild": "^0.25.0",
+    "obsidian": "^1.8.10",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0"
+  }
+}
