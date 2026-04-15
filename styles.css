@@ -11,6 +11,22 @@
   background: var(--background-secondary);
 }
 
+.slasher-settings-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 14px;
+}
+
+.slasher-settings-add-row-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
 .slasher-settings-table-header,
 .slasher-settings-table-row {
   display: grid;
@@ -106,6 +122,8 @@
 }
 
 .slasher-settings-footer {
+  display: flex;
+  justify-content: flex-end;
   margin-top: 14px;
 }
 

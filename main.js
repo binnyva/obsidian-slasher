@@ -2233,9 +2233,23 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
       }
     }
     const footerEl = containerEl.createDiv({ cls: "slasher-settings-footer" });
-    new ButtonComponent(footerEl).setButtonText("+ Add row").setCta().onClick(async () => {
-      await this.plugin.addEmptyCommand();
-      this.display();
+    this.renderAddRowButton(footerEl, "+ Add row");
+  }
+  renderAddRowButton(parentEl, label) {
+    const buttonEl = parentEl.createEl("button", {
+      cls: "mod-cta slasher-settings-add-row-button",
+      text: label
+    });
+    buttonEl.type = "button";
+    buttonEl.addEventListener("click", async () => {
+      try {
+        await this.plugin.addEmptyCommand();
+        this.display();
+      } catch (error) {
+        const message2 = error instanceof Error && error.message ? error.message : "Failed to add a new command row.";
+        new import_obsidian2.Notice(`Slasher: ${message2}`);
+        console.error("Slasher add row failed", error);
+      }
     });
   }
   renderCommandRow(parentEl, command) {
@@ -2303,10 +2317,14 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
       cls: "slasher-settings-cell slasher-settings-cell--action"
     });
     actionCell.setAttr("data-label", "Action");
-    new import_obsidian2.ExtraButtonComponent(actionCell).setIcon("trash").setTooltip("Delete command").setWarning().onClick(async () => {
+    const deleteButton = new import_obsidian2.ExtraButtonComponent(actionCell).setIcon("trash").setTooltip("Delete command").onClick(async () => {
       await this.plugin.removeCommand(command.id);
       this.display();
-    }).extraSettingsEl.addClass("slasher-settings-delete-button");
+    });
+    if (typeof deleteButton.setWarning === "function") {
+      deleteButton.setWarning();
+    }
+    deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
     if (issues.length > 0) {
       rowEl.createDiv({
         cls: "slasher-validation slasher-settings-validation",
@@ -2350,7 +2368,7 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
   }
   async addEmptyCommand() {
     this.settings.commands.push({
-      id: crypto.randomUUID(),
+      id: this.createCommandId(),
       name: "",
       template: "",
       enabled: true
@@ -2383,6 +2401,13 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
       version: 1,
       commands
     };
+  }
+  createCommandId() {
+    const randomUuid = globalThis.crypto?.randomUUID?.();
+    if (randomUuid) {
+      return randomUuid;
+    }
+    return `template-command-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
   async rebuildCommands() {
     this.clearRegisteredCommands();

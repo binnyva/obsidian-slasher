@@ -39,7 +39,7 @@ export default class SlasherPlugin extends Plugin {
 
 	async addEmptyCommand(): Promise<void> {
 		this.settings.commands.push({
-			id: crypto.randomUUID(),
+			id: this.createCommandId(),
 			name: "",
 			template: "",
 			enabled: true,
@@ -83,6 +83,15 @@ export default class SlasherPlugin extends Plugin {
 			version: 1,
 			commands,
 		};
+	}
+
+	private createCommandId(): string {
+		const randomUuid = globalThis.crypto?.randomUUID?.();
+		if (randomUuid) {
+			return randomUuid;
+		}
+
+		return `template-command-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 	}
 
 	private async rebuildCommands(): Promise<void> {

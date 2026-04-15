@@ -1,5 +1,6 @@
 import {
 	ExtraButtonComponent,
+	Notice,
 	PluginSettingTab,
 	TextAreaComponent,
 	TextComponent,
@@ -74,13 +75,28 @@ export class SlasherSettingTab extends PluginSettingTab {
 		}
 
 		const footerEl = containerEl.createDiv({ cls: "slasher-settings-footer" });
-		new ButtonComponent(footerEl)
-			.setButtonText("+ Add row")
-			.setCta()
-			.onClick(async () => {
+		this.renderAddRowButton(footerEl, "+ Add row");
+	}
+
+	private renderAddRowButton(parentEl: HTMLElement, label: string): void {
+		const buttonEl = parentEl.createEl("button", {
+			cls: "mod-cta slasher-settings-add-row-button",
+			text: label,
+		});
+		buttonEl.type = "button";
+		buttonEl.addEventListener("click", async () => {
+			try {
 				await this.plugin.addEmptyCommand();
 				this.display();
-			});
+			} catch (error) {
+				const message =
+					error instanceof Error && error.message
+						? error.message
+						: "Failed to add a new command row.";
+				new Notice(`Slasher: ${message}`);
+				console.error("Slasher add row failed", error);
+			}
+		});
 	}
 
 	private renderCommandRow(parentEl: HTMLElement, command: TemplateCommand): void {
@@ -173,15 +189,17 @@ export class SlasherSettingTab extends PluginSettingTab {
 			cls: "slasher-settings-cell slasher-settings-cell--action",
 		});
 		actionCell.setAttr("data-label", "Action");
-		new ExtraButtonComponent(actionCell)
+		const deleteButton = new ExtraButtonComponent(actionCell)
 			.setIcon("trash")
 			.setTooltip("Delete command")
-			.setWarning()
 			.onClick(async () => {
 				await this.plugin.removeCommand(command.id);
 				this.display();
-			})
-			.extraSettingsEl.addClass("slasher-settings-delete-button");
+			});
+		if (typeof deleteButton.setWarning === "function") {
+			deleteButton.setWarning();
+		}
+		deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
 
 		if (issues.length > 0) {
 			rowEl.createDiv({

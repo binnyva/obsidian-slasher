@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node esbuild.config.mjs production",
     "dev": "node esbuild.config.mjs",
-    "dev-deploy": "npm run build && node scripts/dev-deploy.mjs",
+    "dev-deploy": "npm run build && node scripts/deploy.mjs dev",
+    "prod-deploy": "npm run build && node scripts/deploy.mjs prod",
     "test": "node --import tsx --test test/**/*.test.ts"
   },
   "keywords": [
