@@ -6,7 +6,7 @@ If you want to use this with the slash command, than the Slash Command core plug
 
 You can also [set custom keyboard shortcuts for your custom commands](https://obsidian.md/help/hotkeys).
 
-![Sample Use Case](./docs/assets/slash-commands.gif)
+![Sample Use Case](./docs/assets/slash-commands-light.gif)
 
 ## Template Syntax and Example Use Cases
 
@@ -149,7 +149,7 @@ Replaces only the first regex match in string values. The third argument is opti
 
 ## Settings UI
 
-![Sample Settings](./docs/assets/settings.png?raw=true)
+![Sample Settings](./docs/assets/settings-light.png)
 
 All commands you have added are listed in the Settings page.
 
