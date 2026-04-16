@@ -71,8 +71,8 @@ export class TemplateBuilderModal extends Modal {
 		let dateFormat = "yyyy-MM-dd";
 		let replaceFrom = "replace";
 		let replaceTo = "this";
-		let commandBody = "ls -1 {vaultPath}";
-		let vaultToken = "filePath";
+		let commandBody = "ls -1 {{ vault_path }}";
+		let vaultToken = "file_path";
 		let pickerFormat = "yyyy-MM-dd";
 
 		const form = contentEl.createDiv({ cls: "slasher-modal-grid" });
@@ -112,8 +112,8 @@ export class TemplateBuilderModal extends Modal {
 							.addOption("today", "today")
 							.addOption("tomorrow", "tomorrow")
 							.addOption("yesterday", "yesterday")
-							.addOption("file-creation-date", "file-creation-date")
-							.addOption("file-modification-date", "file-modification-date")
+							.addOption("file_creation_date", "file_creation_date")
+							.addOption("file_modification_date", "file_modification_date")
 							.setValue(dateToken)
 							.onChange((value) => {
 								dateToken = value;
@@ -133,7 +133,7 @@ export class TemplateBuilderModal extends Modal {
 			if (snippetKind === "clipboard") {
 				new Setting(dynamicSection)
 					.setName("Replace")
-					.setDesc("Used to build a starter sed: transform.")
+					.setDesc("Used to build a starter replace_first filter.")
 					.addText((text) => {
 						text.setValue(replaceFrom).onChange((value) => {
 							replaceFrom = value;
@@ -152,9 +152,9 @@ export class TemplateBuilderModal extends Modal {
 			if (snippetKind === "command") {
 				new Setting(dynamicSection)
 					.setName("Shell command")
-					.setDesc("You can include placeholders like {vaultPath} inside the command body.")
+					.setDesc("You can include output tags like {{ vault_path }} inside the command body.")
 					.addText((text: TextComponent) => {
-						text.setPlaceholder("ls -1 {vaultPath}")
+						text.setPlaceholder("ls -1 {{ vault_path }}")
 							.setValue(commandBody)
 							.onChange((value) => {
 								commandBody = value;
@@ -165,15 +165,15 @@ export class TemplateBuilderModal extends Modal {
 
 			if (snippetKind === "vault") {
 				new Setting(dynamicSection)
-					.setName("Placeholder")
+					.setName("Variable")
 					.addDropdown((dropdown) => {
 						dropdown
-							.addOption("filePath", "{filePath}")
-							.addOption("fileName", "{fileName}")
-							.addOption("fileStem", "{fileStem}")
-							.addOption("folderPath", "{folderPath}")
-							.addOption("vaultPath", "{vaultPath}")
-							.addOption("vaultName", "{vaultName}")
+							.addOption("file_path", "{{ file_path }}")
+							.addOption("file_name", "{{ file_name }}")
+							.addOption("file_stem", "{{ file_stem }}")
+							.addOption("folder_path", "{{ folder_path }}")
+							.addOption("vault_path", "{{ vault_path }}")
+							.addOption("vault_name", "{{ vault_name }}")
 							.setValue(vaultToken)
 							.onChange((value) => {
 								vaultToken = value;
@@ -184,7 +184,7 @@ export class TemplateBuilderModal extends Modal {
 			if (snippetKind === "date-picker") {
 				new Setting(dynamicSection)
 					.setName("Format")
-					.setDesc("Uses date-fns tokens after the date is chosen.")
+					.setDesc("Uses date-fns tokens with the date_picker format filter.")
 					.addText((text) => {
 						text.setValue(pickerFormat).onChange((value) => {
 							pickerFormat = value.trim() || "yyyy-MM-dd";
@@ -230,17 +230,17 @@ export class TemplateBuilderModal extends Modal {
 	}): string {
 		switch (values.snippetKind) {
 			case "date":
-				return `{${values.dateToken}}|format:${values.dateFormat}`;
+				return `{{ ${values.dateToken} | format: "${escapeLiquidString(values.dateFormat)}" }}`;
 			case "clipboard":
-				return `{clipboard}|sed:/${escapeSedSegment(values.replaceFrom)}/${escapeSedSegment(values.replaceTo)}/`;
+				return `{{ clipboard | replace_first: "${escapeLiquidString(values.replaceFrom)}", "${escapeLiquidString(values.replaceTo)}" }}`;
 			case "command":
-				return `{command:${values.commandBody || "ls -1 {vaultPath}"}}`;
+				return `{% command %}${values.commandBody || "ls -1 {{ vault_path }}"}{% endcommand %}`;
 			case "vault":
-				return `{${values.vaultToken}}`;
+				return `{{ ${values.vaultToken} }}`;
 			case "date-picker":
-				return `{date-picker}|format:${values.pickerFormat}`;
+				return `{{ date_picker | format: "${escapeLiquidString(values.pickerFormat)}" }}`;
 			default:
-				return "{today}|format:yyyy-MM-dd";
+				return '{{ today | format: "yyyy-MM-dd" }}';
 		}
 	}
 
@@ -249,6 +249,6 @@ export class TemplateBuilderModal extends Modal {
 	}
 }
 
-function escapeSedSegment(value: string): string {
-	return value.replaceAll("/", "\\/");
+function escapeLiquidString(value: string): string {
+	return value.replaceAll("\\", "\\\\").replaceAll("\"", "\\\"");
 }

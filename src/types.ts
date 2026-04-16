@@ -37,43 +37,48 @@ export interface ParsedTemplate {
 	segments: TemplateSegment[];
 }
 
-export type TemplateSegment = TextSegment | TokenSegment;
+export type TemplateSegment = TextSegment | OutputSegment | CommandSegment;
 
 export interface TextSegment {
 	type: "text";
 	value: string;
 }
 
-export interface TokenSegment {
-	type: "token";
+export interface OutputSegment {
+	type: "output";
 	raw: string;
-	token: TokenDescriptor;
-	transforms: TransformDescriptor[];
+	expression: OutputExpression;
 }
 
-export type TokenDescriptor =
-	| { kind: "date"; token: DateTokenName }
-	| { kind: "clipboard" }
-	| { kind: "vault"; token: VaultTokenName }
-	| { kind: "command"; command: string }
-	| { kind: "date-picker" };
-
-export interface TransformDescriptor {
-	name: string;
-	argument: string;
+export interface CommandSegment {
+	type: "command";
+	raw: string;
+	body: ParsedTemplate;
 }
 
-export type DateTokenName =
+export interface OutputExpression {
+	variable: TemplateVariableName;
+	filters: FilterDescriptor[];
+}
+
+export interface FilterDescriptor {
+	name: FilterName;
+	arguments: string[];
+}
+
+export type FilterName = "format" | "replace" | "replace_first";
+
+export type TemplateVariableName =
 	| "today"
 	| "tomorrow"
 	| "yesterday"
-	| "file-creation-date"
-	| "file-modification-date";
-
-export type VaultTokenName =
-	| "filePath"
-	| "fileName"
-	| "fileStem"
-	| "folderPath"
-	| "vaultPath"
-	| "vaultName";
+	| "clipboard"
+	| "file_creation_date"
+	| "file_modification_date"
+	| "file_path"
+	| "file_name"
+	| "file_stem"
+	| "folder_path"
+	| "vault_path"
+	| "vault_name"
+	| "date_picker";

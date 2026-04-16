@@ -1,16 +1,16 @@
 import { addDays, format as formatDate } from "date-fns";
 
 import type {
-	DateTokenName,
 	FileContext,
+	FilterDescriptor,
+	OutputExpression,
 	ParsedTemplate,
 	TemplateRuntimeContext,
 	TemplateSegment,
-	TokenDescriptor,
-	TokenSegment,
-	TransformDescriptor,
-	VaultTokenName,
+	TemplateVariableName,
 } from "./types";
+
+type ParseMode = "root" | "command";
 
 type ResolvedValue =
 	| {
@@ -22,26 +22,33 @@ type ResolvedValue =
 			value: Date;
 	  };
 
-const DATE_TOKEN_ALIASES: Record<string, DateTokenName> = {
-	today: "today",
-	tomorrow: "tomorrow",
-	tomorow: "tomorrow",
-	tommorow: "tomorrow",
-	yesterday: "yesterday",
-	"file-creation-date": "file-creation-date",
-	fileCreationDate: "file-creation-date",
-	"file-modification-date": "file-modification-date",
-	fileModificationDate: "file-modification-date",
-};
+const OUTPUT_TAG_OPEN = "{{";
+const OUTPUT_TAG_CLOSE = "}}";
+const TAG_OPEN = "{%";
+const TAG_CLOSE = "%}";
+const END_COMMAND_TAG = "{% endcommand %}";
 
-const VAULT_TOKENS = new Set<VaultTokenName>([
-	"filePath",
-	"fileName",
-	"fileStem",
-	"folderPath",
-	"vaultPath",
-	"vaultName",
+const TEMPLATE_VARIABLES = new Set<TemplateVariableName>([
+	"today",
+	"tomorrow",
+	"yesterday",
+	"clipboard",
+	"file_creation_date",
+	"file_modification_date",
+	"file_path",
+	"file_name",
+	"file_stem",
+	"folder_path",
+	"vault_path",
+	"vault_name",
+	"date_picker",
 ]);
+
+const FILTER_ARGUMENT_COUNTS: Record<FilterDescriptor["name"], number> = {
+	format: 1,
+	replace: 2,
+	replace_first: 2,
+};
 
 export class TemplateError extends Error {
 	constructor(message: string) {
@@ -74,6 +81,13 @@ export function validateTemplateCommand(name: string, template: string): string[
 
 	if (!sanitizeTemplate(template)) {
 		issues.push("Template is required.");
+		return issues;
+	}
+
+	try {
+		parseTemplate(template);
+	} catch (error) {
+		issues.push(error instanceof TemplateError ? error.message : "Template syntax is invalid.");
 	}
 
 	return issues;
@@ -84,13 +98,19 @@ export function buildCommandRegistrationId(commandId: string): string {
 }
 
 export function parseTemplate(template: string): ParsedTemplate {
+	return parseTemplateInternal(template, "root");
+}
+
+function parseTemplateInternal(template: string, mode: ParseMode): ParsedTemplate {
 	const segments: TemplateSegment[] = [];
 	let cursor = 0;
 
 	while (cursor < template.length) {
-		const start = template.indexOf("{", cursor);
+		const nextOutput = template.indexOf(OUTPUT_TAG_OPEN, cursor);
+		const nextTag = template.indexOf(TAG_OPEN, cursor);
+		const nextIndex = findNextTokenIndex(nextOutput, nextTag);
 
-		if (start === -1) {
+		if (nextIndex === -1) {
 			segments.push({
 				type: "text",
 				value: template.slice(cursor),
@@ -98,390 +118,208 @@ export function parseTemplate(template: string): ParsedTemplate {
 			break;
 		}
 
-		if (start > cursor) {
+		if (nextIndex > cursor) {
 			segments.push({
 				type: "text",
-				value: template.slice(cursor, start),
+				value: template.slice(cursor, nextIndex),
 			});
 		}
 
-		const parsedToken = parseTokenSegment(template, start);
-		segments.push(parsedToken.segment);
-		cursor = parsedToken.nextIndex;
+		if (nextIndex === nextOutput) {
+			const parsedOutput = parseOutputSegment(template, nextIndex);
+			segments.push(parsedOutput.segment);
+			cursor = parsedOutput.nextIndex;
+			continue;
+		}
+
+		const parsedTag = parseTagSegment(template, nextIndex, mode);
+		segments.push(parsedTag.segment);
+		cursor = parsedTag.nextIndex;
 	}
 
 	return { segments };
 }
 
-function parseTokenSegment(template: string, start: number): { segment: TokenSegment; nextIndex: number } {
-	let depth = 0;
-	let end = start;
-
-	for (; end < template.length; end += 1) {
-		const character = template[end];
-		if (character === "{") {
-			depth += 1;
-		} else if (character === "}") {
-			depth -= 1;
-			if (depth === 0) {
-				break;
-			}
-		}
+function findNextTokenIndex(nextOutput: number, nextTag: number): number {
+	if (nextOutput === -1) {
+		return nextTag;
 	}
 
-	if (depth !== 0) {
-		throw new TemplateError("Unclosed template token.");
+	if (nextTag === -1) {
+		return nextOutput;
 	}
 
-	const rawToken = template.slice(start + 1, end).trim();
-	if (!rawToken) {
-		throw new TemplateError("Empty template token.");
+	return Math.min(nextOutput, nextTag);
+}
+
+function parseOutputSegment(template: string, start: number): { segment: TemplateSegment; nextIndex: number } {
+	const closeIndex = template.indexOf(OUTPUT_TAG_CLOSE, start + OUTPUT_TAG_OPEN.length);
+	if (closeIndex === -1) {
+		throw new TemplateError("Unclosed Liquid output tag.");
 	}
 
-	const token = parseTokenDescriptor(rawToken);
-	const { transforms, nextIndex } = parseTransforms(template, end + 1);
+	const raw = template.slice(start, closeIndex + OUTPUT_TAG_CLOSE.length);
+	const expressionSource = template.slice(start + OUTPUT_TAG_OPEN.length, closeIndex).trim();
+	if (!expressionSource) {
+		throw new TemplateError("Empty Liquid output tag.");
+	}
 
 	return {
 		segment: {
-			type: "token",
-			raw: template.slice(start, nextIndex),
-			token,
-			transforms,
+			type: "output",
+			raw,
+			expression: parseOutputExpression(expressionSource),
 		},
-		nextIndex,
+		nextIndex: closeIndex + OUTPUT_TAG_CLOSE.length,
 	};
 }
 
-function parseTransforms(template: string, start: number): { transforms: TransformDescriptor[]; nextIndex: number } {
-	const transforms: TransformDescriptor[] = [];
-	let cursor = start;
-
-	while (template[cursor] === "|") {
-		const nameStart = cursor + 1;
-		const colonIndex = template.indexOf(":", nameStart);
-		if (colonIndex === -1) {
-			break;
-		}
-
-		const name = template.slice(nameStart, colonIndex).trim();
-		if (!name || !/^[a-z-]+$/i.test(name)) {
-			break;
-		}
-
-		const { argument, nextIndex } = parseTransformArgument(template, colonIndex + 1, name);
-		transforms.push({ name, argument });
-		cursor = nextIndex;
+function parseTagSegment(
+	template: string,
+	start: number,
+	mode: ParseMode,
+): { segment: TemplateSegment; nextIndex: number } {
+	const closeIndex = template.indexOf(TAG_CLOSE, start + TAG_OPEN.length);
+	if (closeIndex === -1) {
+		throw new TemplateError("Unclosed Liquid tag.");
 	}
 
-	return {
-		transforms,
-		nextIndex: cursor,
-	};
-}
-
-function looksLikeTransformStart(template: string, index: number): boolean {
-	const remainder = template.slice(index + 1);
-	return /^[a-z-]+:/i.test(remainder);
-}
-
-function parseTransformArgument(template: string, start: number, name: string): { argument: string; nextIndex: number } {
-	if (name === "sed") {
-		return parseSedArgument(template, start);
+	const rawTag = template.slice(start, closeIndex + TAG_CLOSE.length);
+	const tagSource = template.slice(start + TAG_OPEN.length, closeIndex).trim();
+	if (!tagSource) {
+		throw new TemplateError("Empty Liquid tag.");
 	}
 
-	let end = start;
-	while (end < template.length) {
-		const character = template[end];
-		if (character === "|" && looksLikeTransformStart(template, end)) {
-			break;
+	if (tagSource === "command") {
+		if (mode === "command") {
+			throw new TemplateError("Nested command tags are not supported.");
 		}
-		if (character === "{" || /\s/.test(character)) {
-			break;
+
+		const endTagIndex = template.indexOf(END_COMMAND_TAG, closeIndex + TAG_CLOSE.length);
+		if (endTagIndex === -1) {
+			throw new TemplateError("Unclosed command tag.");
 		}
-		end += 1;
-	}
 
-	return {
-		argument: template.slice(start, end),
-		nextIndex: end,
-	};
-}
-
-function parseSedArgument(template: string, start: number): { argument: string; nextIndex: number } {
-	if (template[start] !== "/") {
-		throw new TemplateError("sed: expressions must start with '/'.");
-	}
-
-	let slashCount = 0;
-	let escaped = false;
-	let index = start;
-
-	for (; index < template.length; index += 1) {
-		const character = template[index];
-		if (escaped) {
-			escaped = false;
-			continue;
-		}
-		if (character === "\\") {
-			escaped = true;
-			continue;
-		}
-		if (character === "/") {
-			slashCount += 1;
-			if (slashCount === 3) {
-				index += 1;
-				if (template[index] === "g") {
-					index += 1;
-				}
-				break;
-			}
-		}
-	}
-
-	if (slashCount < 3) {
-		throw new TemplateError("sed: expressions must look like /from/to/ or /from/to/g.");
-	}
-
-	return {
-		argument: template.slice(start, index),
-		nextIndex: index,
-	};
-}
-
-export function parseTokenDescriptor(rawToken: string): TokenDescriptor {
-	const trimmed = rawToken.trim();
-
-	if (trimmed.startsWith("command:")) {
-		const command = trimmed.slice("command:".length).trim();
-		if (!command) {
-			throw new TemplateError("Command token requires a shell command.");
-		}
+		const bodySource = template.slice(closeIndex + TAG_CLOSE.length, endTagIndex);
+		const body = parseTemplateInternal(bodySource, "command");
 		return {
-			kind: "command",
-			command,
+			segment: {
+				type: "command",
+				raw: `${rawTag}${bodySource}${END_COMMAND_TAG}`,
+				body,
+			},
+			nextIndex: endTagIndex + END_COMMAND_TAG.length,
 		};
 	}
 
-	if (trimmed === "clipboard") {
-		return { kind: "clipboard" };
+	if (tagSource === "endcommand") {
+		throw new TemplateError("Unexpected endcommand tag.");
 	}
 
-	if (trimmed === "date-picker") {
-		return { kind: "date-picker" };
-	}
+	if (tagSource.startsWith("date_picker")) {
+		if (mode === "command") {
+			throw new TemplateError("date_picker is not supported inside command tags.");
+		}
 
-	if (trimmed in DATE_TOKEN_ALIASES) {
+		const format = parseDatePickerFormat(tagSource);
 		return {
-			kind: "date",
-			token: DATE_TOKEN_ALIASES[trimmed],
+			segment: {
+				type: "output",
+				raw: rawTag,
+				expression: {
+					variable: "date_picker",
+					filters: [
+						{
+							name: "format",
+							arguments: [format],
+						},
+					],
+				},
+			},
+			nextIndex: closeIndex + TAG_CLOSE.length,
 		};
 	}
 
-	if (VAULT_TOKENS.has(trimmed as VaultTokenName)) {
-		return {
-			kind: "vault",
-			token: trimmed as VaultTokenName,
-		};
-	}
-
-	throw new TemplateError(`Unsupported template token: ${trimmed}`);
+	throw new TemplateError(`Unsupported Liquid tag: ${tagSource}`);
 }
 
-export async function renderTemplate(template: string, context: TemplateRuntimeContext): Promise<string> {
-	const parsed = parseTemplate(template);
-	let output = "";
+function parseDatePickerFormat(tagSource: string): string {
+	let index = "date_picker".length;
+	index = skipWhitespace(tagSource, index);
 
-	for (const segment of parsed.segments) {
-		if (segment.type === "text") {
-			output += segment.value;
-			continue;
-		}
-
-		output += await renderTokenSegment(segment, context);
+	if (index >= tagSource.length) {
+		throw new TemplateError("date_picker requires a format argument.");
 	}
 
-	return output;
+	if (!tagSource.startsWith("format", index)) {
+		throw new TemplateError("date_picker only supports the format argument.");
+	}
+	index += "format".length;
+	index = skipWhitespace(tagSource, index);
+
+	if (tagSource[index] !== ":") {
+		throw new TemplateError("date_picker format must use format: \"...\".");
+	}
+	index += 1;
+	index = skipWhitespace(tagSource, index);
+
+	const { value, nextIndex } = parseQuotedString(tagSource, index);
+	index = skipWhitespace(tagSource, nextIndex);
+
+	if (index !== tagSource.length) {
+		throw new TemplateError("date_picker only supports a single format argument.");
+	}
+
+	return value;
 }
 
-async function renderTokenSegment(segment: TokenSegment, context: TemplateRuntimeContext): Promise<string> {
-	let resolved = await resolveToken(segment.token, context);
-	const hasFormatTransform = segment.transforms.some((transform) => transform.name === "format");
-
-	for (const transform of segment.transforms) {
-		resolved = applyTransform(resolved, transform);
+function parseOutputExpression(source: string): OutputExpression {
+	const parts = splitByPipes(source);
+	if (parts.length === 0) {
+		throw new TemplateError("Empty Liquid expression.");
 	}
 
-	if (resolved.kind === "date" && !hasFormatTransform) {
-		resolved = applyTransform(resolved, {
-			name: "format",
-			argument: "yyyy-MM-dd",
-		});
+	const variable = parts[0]?.trim() ?? "";
+	if (!TEMPLATE_VARIABLES.has(variable as TemplateVariableName)) {
+		throw new TemplateError(`Unsupported template variable: ${variable}`);
 	}
 
-	if (resolved.kind === "date") {
-		throw new TemplateError("Date values must be formatted before insertion.");
-	}
-
-	return resolved.value;
+	return {
+		variable: variable as TemplateVariableName,
+		filters: parts.slice(1).map((part) => parseFilter(part.trim())),
+	};
 }
 
-async function resolveToken(token: TokenDescriptor, context: TemplateRuntimeContext): Promise<ResolvedValue> {
-	switch (token.kind) {
-		case "clipboard":
-			return {
-				kind: "string",
-				value: await context.readClipboard(),
-			};
-		case "command": {
-			const command = await renderShellCommandTemplate(token.command, context);
-			return {
-				kind: "string",
-				value: await context.executeShellCommand(command),
-			};
-		}
-		case "date":
-			return {
-				kind: "date",
-				value: resolveDateToken(token.token, context),
-			};
-		case "date-picker": {
-			const pickedDate = await context.pickDate();
-			if (!pickedDate) {
-				throw new TemplateError("Date picker was cancelled.");
-			}
-			return {
-				kind: "date",
-				value: pickedDate,
-			};
-		}
-		case "vault":
-			return {
-				kind: "string",
-				value: resolveVaultToken(token.token, context),
-			};
-		default:
-			throw new TemplateError("Unsupported token.");
-	}
-}
-
-export async function renderShellCommandTemplate(template: string, context: TemplateRuntimeContext): Promise<string> {
-	const parsed = parseTemplate(template);
-	let command = "";
-
-	for (const segment of parsed.segments) {
-		if (segment.type === "text") {
-			command += segment.value;
-			continue;
-		}
-
-		const resolved = await resolveToken(segment.token, context);
-		if (resolved.kind === "date") {
-			throw new TemplateError("Date values are not supported inside shell command templates.");
-		}
-		command += shellEscape(resolved.value);
-	}
-
-	return command;
-}
-
-function resolveDateToken(token: DateTokenName, context: TemplateRuntimeContext): Date {
-	switch (token) {
-		case "today":
-			return context.now;
-		case "tomorrow":
-			return addDays(context.now, 1);
-		case "yesterday":
-			return addDays(context.now, -1);
-		case "file-creation-date":
-			return requireFileContext(context.file, "file-creation-date").creationDate;
-		case "file-modification-date":
-			return requireFileContext(context.file, "file-modification-date").modificationDate;
-		default:
-			throw new TemplateError("Unsupported date token.");
-	}
-}
-
-function resolveVaultToken(token: VaultTokenName, context: TemplateRuntimeContext): string {
-	switch (token) {
-		case "vaultPath":
-			return context.vault.path;
-		case "vaultName":
-			return context.vault.name;
-		case "filePath":
-			return requireFileContext(context.file, "filePath").path;
-		case "fileName":
-			return requireFileContext(context.file, "fileName").name;
-		case "fileStem":
-			return requireFileContext(context.file, "fileStem").stem;
-		case "folderPath":
-			return requireFileContext(context.file, "folderPath").folderPath;
-		default:
-			throw new TemplateError("Unsupported vault token.");
-	}
-}
-
-function requireFileContext(file: FileContext | undefined, token: string): FileContext {
-	if (!file) {
-		throw new TemplateError(`Token {${token}} requires an active file.`);
-	}
-
-	return file;
-}
-
-function applyTransform(value: ResolvedValue, transform: TransformDescriptor): ResolvedValue {
-	switch (transform.name) {
-		case "format":
-			if (value.kind !== "date") {
-				throw new TemplateError("format: can only be used with date values.");
-			}
-			return {
-				kind: "string",
-				value: formatDate(value.value, transform.argument || "yyyy-MM-dd"),
-			};
-		case "sed":
-			if (value.kind !== "string") {
-				throw new TemplateError("sed: can only be used with string values.");
-			}
-			return {
-				kind: "string",
-				value: applySedTransform(value.value, transform.argument),
-			};
-		default:
-			throw new TemplateError(`Unsupported transform: ${transform.name}`);
-	}
-}
-
-export function applySedTransform(value: string, expression: string): string {
-	const parsed = parseSedExpression(expression);
-	const flags = parsed.global ? "g" : "";
-	const pattern = new RegExp(escapeForRegExp(parsed.search), flags);
-	return value.replace(pattern, parsed.replace);
-}
-
-function parseSedExpression(expression: string): { search: string; replace: string; global: boolean } {
-	if (!expression.startsWith("/")) {
-		throw new TemplateError("sed: expressions must start with '/'.");
-	}
-
+function splitByPipes(source: string): string[] {
 	const parts: string[] = [];
 	let current = "";
+	let quote: string | null = null;
 	let escaped = false;
 
-	for (let index = 1; index < expression.length; index += 1) {
-		const character = expression[index];
-
+	for (const character of source) {
 		if (escaped) {
 			current += character;
 			escaped = false;
 			continue;
 		}
 
-		if (character === "\\") {
-			escaped = true;
+		if (quote) {
+			current += character;
+			if (character === "\\") {
+				escaped = true;
+			} else if (character === quote) {
+				quote = null;
+			}
 			continue;
 		}
 
-		if (character === "/") {
+		if (character === "'" || character === "\"") {
+			quote = character;
+			current += character;
+			continue;
+		}
+
+		if (character === "|") {
 			parts.push(current);
 			current = "";
 			continue;
@@ -490,24 +328,335 @@ function parseSedExpression(expression: string): { search: string; replace: stri
 		current += character;
 	}
 
-	if (current) {
-		parts.push(current);
+	if (quote) {
+		throw new TemplateError("Unclosed string literal in Liquid expression.");
 	}
 
-	if (parts.length < 2 || parts.length > 3) {
-		throw new TemplateError("sed: expressions must look like /from/to/ or /from/to/g.");
+	parts.push(current);
+	return parts;
+}
+
+function parseFilter(source: string): FilterDescriptor {
+	if (!source) {
+		throw new TemplateError("Empty Liquid filter.");
 	}
 
-	const [search, replace, maybeFlag] = parts;
+	const colonIndex = indexOfUnquoted(source, ":");
+	const name = (colonIndex === -1 ? source : source.slice(0, colonIndex)).trim();
+	if (!(name in FILTER_ARGUMENT_COUNTS)) {
+		throw new TemplateError(`Unsupported filter: ${name}`);
+	}
+
+	const expectedArgumentCount = FILTER_ARGUMENT_COUNTS[name as FilterDescriptor["name"]];
+	const argsSource = colonIndex === -1 ? "" : source.slice(colonIndex + 1).trim();
+	const args = argsSource ? parseFilterArguments(argsSource) : [];
+
+	if (args.length !== expectedArgumentCount) {
+		const suffix = expectedArgumentCount === 1 ? "" : "s";
+		throw new TemplateError(`${name} requires ${expectedArgumentCount} argument${suffix}.`);
+	}
+
 	return {
-		search,
-		replace,
-		global: maybeFlag === "g",
+		name: name as FilterDescriptor["name"],
+		arguments: args,
 	};
 }
 
-function escapeForRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function parseFilterArguments(source: string): string[] {
+	const args: string[] = [];
+	let index = 0;
+
+	while (index < source.length) {
+		index = skipWhitespace(source, index);
+		if (index >= source.length) {
+			break;
+		}
+
+		const parsed = parseQuotedString(source, index);
+		args.push(parsed.value);
+		index = skipWhitespace(source, parsed.nextIndex);
+
+		if (index >= source.length) {
+			break;
+		}
+
+		if (source[index] !== ",") {
+			throw new TemplateError("Filter arguments must be quoted strings separated by commas.");
+		}
+
+		index += 1;
+	}
+
+	return args;
+}
+
+function parseQuotedString(source: string, index: number): { value: string; nextIndex: number } {
+	const quote = source[index];
+	if (quote !== "'" && quote !== "\"") {
+		throw new TemplateError("String arguments must be wrapped in quotes.");
+	}
+
+	let value = "";
+	let cursor = index + 1;
+
+	while (cursor < source.length) {
+		const character = source[cursor];
+		if (character === "\\") {
+			const nextCharacter = source[cursor + 1];
+			if (nextCharacter === undefined) {
+				throw new TemplateError("Invalid escape sequence in string argument.");
+			}
+			value += nextCharacter;
+			cursor += 2;
+			continue;
+		}
+
+		if (character === quote) {
+			return {
+				value,
+				nextIndex: cursor + 1,
+			};
+		}
+
+		value += character;
+		cursor += 1;
+	}
+
+	throw new TemplateError("Unclosed string argument.");
+}
+
+function skipWhitespace(source: string, index: number): number {
+	while (index < source.length && /\s/.test(source[index] ?? "")) {
+		index += 1;
+	}
+
+	return index;
+}
+
+function indexOfUnquoted(source: string, target: string): number {
+	let quote: string | null = null;
+	let escaped = false;
+
+	for (let index = 0; index < source.length; index += 1) {
+		const character = source[index];
+		if (escaped) {
+			escaped = false;
+			continue;
+		}
+
+		if (quote) {
+			if (character === "\\") {
+				escaped = true;
+			} else if (character === quote) {
+				quote = null;
+			}
+			continue;
+		}
+
+		if (character === "'" || character === "\"") {
+			quote = character;
+			continue;
+		}
+
+		if (character === target) {
+			return index;
+		}
+	}
+
+	return -1;
+}
+
+export async function renderTemplate(template: string, context: TemplateRuntimeContext): Promise<string> {
+	const parsed = parseTemplate(template);
+	return renderParsedTemplate(parsed, context, "root");
+}
+
+export async function renderShellCommandTemplate(
+	template: string,
+	context: TemplateRuntimeContext,
+): Promise<string> {
+	const parsed = parseTemplateInternal(template, "command");
+	return renderParsedTemplate(parsed, context, "command");
+}
+
+async function renderParsedTemplate(
+	parsed: ParsedTemplate,
+	context: TemplateRuntimeContext,
+	mode: ParseMode,
+): Promise<string> {
+	let output = "";
+
+	for (const segment of parsed.segments) {
+		switch (segment.type) {
+			case "text":
+				output += segment.value;
+				break;
+			case "output":
+				output += await renderOutputExpression(segment.expression, context, mode);
+				break;
+			case "command": {
+				const command = await renderParsedTemplate(segment.body, context, "command");
+				output += await context.executeShellCommand(command);
+				break;
+			}
+			default:
+				throw new TemplateError("Unsupported template segment.");
+		}
+	}
+
+	return output;
+}
+
+async function renderOutputExpression(
+	expression: OutputExpression,
+	context: TemplateRuntimeContext,
+	mode: ParseMode,
+): Promise<string> {
+	if (expression.variable === "date_picker") {
+		if (mode === "command") {
+			throw new TemplateError("date_picker is not supported inside command tags.");
+		}
+
+		const hasFormatFilter = expression.filters.some((filter) => filter.name === "format");
+		if (!hasFormatFilter) {
+			throw new TemplateError("date_picker must use the format filter before insertion.");
+		}
+	}
+
+	let resolved = await resolveVariable(expression.variable, context);
+
+	for (const filter of expression.filters) {
+		resolved = applyFilter(resolved, filter);
+	}
+
+	if (resolved.kind === "date") {
+		throw new TemplateError("Date values must use the format filter before insertion.");
+	}
+
+	return mode === "command" ? shellEscape(resolved.value) : resolved.value;
+}
+
+async function resolveVariable(
+	variable: TemplateVariableName,
+	context: TemplateRuntimeContext,
+): Promise<ResolvedValue> {
+	switch (variable) {
+		case "clipboard":
+			return {
+				kind: "string",
+				value: await context.readClipboard(),
+			};
+		case "today":
+			return {
+				kind: "date",
+				value: context.now,
+			};
+		case "tomorrow":
+			return {
+				kind: "date",
+				value: addDays(context.now, 1),
+			};
+		case "yesterday":
+			return {
+				kind: "date",
+				value: addDays(context.now, -1),
+			};
+		case "file_creation_date":
+			return {
+				kind: "date",
+				value: requireFileContext(context.file, "file_creation_date").creationDate,
+			};
+		case "file_modification_date":
+			return {
+				kind: "date",
+				value: requireFileContext(context.file, "file_modification_date").modificationDate,
+			};
+		case "vault_path":
+			return {
+				kind: "string",
+				value: context.vault.path,
+			};
+		case "vault_name":
+			return {
+				kind: "string",
+				value: context.vault.name,
+			};
+		case "file_path":
+			return {
+				kind: "string",
+				value: requireFileContext(context.file, "file_path").path,
+			};
+		case "file_name":
+			return {
+				kind: "string",
+				value: requireFileContext(context.file, "file_name").name,
+			};
+		case "file_stem":
+			return {
+				kind: "string",
+				value: requireFileContext(context.file, "file_stem").stem,
+			};
+		case "folder_path":
+			return {
+				kind: "string",
+				value: requireFileContext(context.file, "folder_path").folderPath,
+			};
+		case "date_picker":
+			return {
+				kind: "date",
+				value: await requirePickedDate(context),
+			};
+		default:
+			throw new TemplateError(`Unsupported template variable: ${variable}`);
+	}
+}
+
+async function requirePickedDate(context: TemplateRuntimeContext): Promise<Date> {
+	const pickedDate = await context.pickDate();
+	if (!pickedDate) {
+		throw new TemplateError("Date picker was cancelled.");
+	}
+
+	return pickedDate;
+}
+
+function requireFileContext(file: FileContext | undefined, variable: TemplateVariableName): FileContext {
+	if (!file) {
+		throw new TemplateError(`{{ ${variable} }} requires an active file.`);
+	}
+
+	return file;
+}
+
+function applyFilter(value: ResolvedValue, filter: FilterDescriptor): ResolvedValue {
+	switch (filter.name) {
+		case "format":
+			if (value.kind !== "date") {
+				throw new TemplateError("format can only be used with date values.");
+			}
+			return {
+				kind: "string",
+				value: formatDate(value.value, filter.arguments[0] ?? "yyyy-MM-dd"),
+			};
+		case "replace":
+			if (value.kind !== "string") {
+				throw new TemplateError("replace can only be used with string values.");
+			}
+			return {
+				kind: "string",
+				value: value.value.replaceAll(filter.arguments[0] ?? "", filter.arguments[1] ?? ""),
+			};
+		case "replace_first":
+			if (value.kind !== "string") {
+				throw new TemplateError("replace_first can only be used with string values.");
+			}
+			return {
+				kind: "string",
+				value: value.value.replace(filter.arguments[0] ?? "", filter.arguments[1] ?? ""),
+			};
+		default:
+			throw new TemplateError(`Unsupported filter: ${filter.name}`);
+	}
 }
 
 export function shellEscape(value: string): string {

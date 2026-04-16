@@ -37,7 +37,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 		const introEl = layoutEl.createDiv({ cls: "slasher-settings-intro" });
 		introEl.createEl("p", {
 			cls: "slasher-settings-help",
-			text: "Use the Add helper inside a row to insert starter snippets such as {today}|format:yyyy-MM-dd or {command:ls -1 {vaultPath}}. ",
+			text: 'Use the Add helper inside a row to insert starter snippets such as {{ today | format: "yyyy-MM-dd" }}, {{ date_picker | format: "yyyy-MM-dd" }}, or {% command %}ls -1 {{ vault_path }}{% endcommand %}. ',
 		});
 		introEl.createEl("a", {
 			cls: "slasher-settings-help-link",
@@ -151,7 +151,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 
 		const textArea = new TextAreaComponent(templateCell);
 		textArea
-			.setPlaceholder("{today}|format:yyyy-MM-dd")
+			.setPlaceholder('{{ today | format: "yyyy-MM-dd" }}')
 			.setValue(command.template)
 			.onChange(async (value) => {
 				command.template = value;

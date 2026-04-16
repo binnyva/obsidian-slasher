@@ -1,92 +1,73 @@
 # Slasher
 
-Slasher lets you create custom editor commands that appear in Obsidian's command system, which also makes them available from Slash commands.
-
-Each saved item only has two fields:
-
-- `Command name`
-- `Template`
-
-The plugin is desktop-only in v1 and targets macOS/Linux. Windows is intentionally out of scope for this release because template execution can run local shell commands.
-
-## How Slash Commands Work
-
-Obsidian does not expose a separate public API for adding slash-only entries. This plugin registers normal editor commands through the plugin API, and those commands become searchable from Slash commands and the command palette.
+Slasher lets you create custom editor commands that appear in Obsidian's command system, which also makes them available from Slash commands. Each command has a name and a template. Template string decides what actually shows up in the editor.
 
 ## Template Syntax
 
 Templates are freeform text. Mix plain text with dynamic tokens:
 
 ```text
-Tomorrow: {tomorrow}|format:yyyy-MM-dd
-Clipboard: {clipboard}|sed:/foo/bar/g
+Tomorrow: {{ tomorrow | format: "yyyy-MM-dd" }}
+Clipboard: {{ clipboard | replace: "foo", "bar" }}
+Picked: {{ date_picker | format: "yyyy-MM-dd" }}
 Files:
-{command:ls -1 {vaultPath}}
+{% command %}ls -1 {{ vault_path }}{% endcommand %}
 ```
 
-### Supported Tokens
+### Supported Variables
 
-#### Date tokens
+#### Date variables
 
-- `{today}`
-- `{tomorrow}`
-- `{yesterday}`
-- `{file-creation-date}`
-- `{file-modification-date}`
+- `{{ today }}`
+- `{{ tomorrow }}`
+- `{{ yesterday }}`
+- `{{ file_creation_date }}`
+- `{{ file_modification_date }}`
 
-Accepted aliases:
-
-- `{tomorow}`
-- `{tommorow}`
-- `{fileCreationDate}`
-- `{fileModificationDate}`
-
-If you use a date token without `|format:`, the default output format is `yyyy-MM-dd`.
-
-Use `format:` with date-fns formatting:
+Date values must use the `format` filter before insertion:
 
 ```text
-{today}|format:yyyy-MM-dd
-{tomorrow}|format:EEE
-{file-modification-date}|format:PPP
+{{ today | format: "yyyy-MM-dd" }}
+{{ tomorrow | format: "EEE" }}
+{{ file_modification_date | format: "PPP" }}
 ```
 
 Important: use `MM` for months. `mm` means minutes in date-fns.
 
-#### Clipboard token
+#### Clipboard variable
 
-- `{clipboard}`
-
-Example:
-
-```text
-{clipboard}|sed:/replace/this/
-{clipboard}|sed:/foo/bar/g|sed:/baz/qux/g
-```
-
-#### Vault and file tokens
-
-- `{filePath}`
-- `{fileName}`
-- `{fileStem}`
-- `{folderPath}`
-- `{vaultPath}`
-- `{vaultName}`
-
-File-scoped tokens require an active file. If no file is active, the command shows a Notice and inserts nothing.
-
-#### Shell command token
-
-- `{command:...}`
+- `{{ clipboard }}`
 
 Example:
 
 ```text
-{command:ls -1 {vaultPath}}
-{command:printf "%s" {fileName}}
+{{ clipboard | replace_first: "replace", "this" }}
+{{ clipboard | replace: "foo", "bar" | replace: "baz", "qux" }}
 ```
 
-Nested placeholders inside the command body are resolved before the shell command runs. Inserted placeholder values are shell-escaped.
+#### Vault and file variables
+
+- `{{ file_path }}`
+- `{{ file_name }}`
+- `{{ file_stem }}`
+- `{{ folder_path }}`
+- `{{ vault_path }}`
+- `{{ vault_name }}`
+
+File-scoped variables require an active file. If no file is active, the command shows a Notice and inserts nothing.
+
+#### Shell command tag
+
+- `{% command %}...{% endcommand %}`
+
+Example:
+
+```text
+{% command %}ls -1 {{ vault_path }}{% endcommand %}
+{% command %}printf "%s" {{ file_name }}{% endcommand %}
+```
+
+Nested Liquid output tags inside the command body are resolved before the shell command runs. Inserted values are shell-escaped.
 
 Shell commands are executed with:
 
@@ -96,44 +77,47 @@ Shell commands are executed with:
 
 If the command exits with a non-zero status, the plugin shows a Notice and inserts nothing.
 
-#### Date picker token
+#### Date picker variable
 
-- `{date-picker}`
+- `{{ date_picker | format: "yyyy-MM-dd" }}`
 
 Example:
 
 ```text
-{date-picker}|format:yyyy-MM-dd
+{{ date_picker | format: "yyyy-MM-dd" }}
 ```
 
-When the command runs, the plugin opens a small date picker modal. The chosen date becomes the token value.
+When the command runs, the plugin opens a small date picker modal and inserts the chosen date using the provided format.
 
-### Supported Transforms
+The legacy `{% date_picker format: "..." %}` tag is still accepted for existing templates, but new templates should use the output syntax above.
 
-#### `format:`
+### Supported Filters
+
+#### `format`
 
 Used with date-like values only:
 
 ```text
-{today}|format:yyyy-MM-dd
-{date-picker}|format:PPP
+{{ today | format: "yyyy-MM-dd" }}
+{{ file_creation_date | format: "PPP" }}
+{{ date_picker | format: "EEE, MMM d" }}
 ```
 
-#### `sed:`
+#### `replace`
 
-Used with string values:
+Replaces all literal matches in string values:
 
 ```text
-{clipboard}|sed:/from/to/
-{command:ls -1 {vaultPath}}|sed:/md/txt/g
+{{ clipboard | replace: "from", "to" }}
 ```
 
-This is a plugin-defined lightweight replace syntax, not full `sed` compatibility. v1 supports:
+#### `replace_first`
 
-- `/from/to/`
-- `/from/to/g`
+Replaces only the first literal match in string values:
 
-`from` is treated as a literal string, not a regex.
+```text
+{{ clipboard | replace_first: "from", "to" }}
+```
 
 ## Settings UI
 
@@ -150,45 +134,8 @@ The `Add helper` is just a snippet builder. It inserts starter template text at 
 
 Builder examples:
 
-- Date -> `{today}|format:yyyy-MM-dd`
-- Clipboard -> `{clipboard}|sed:/replace/this/`
-- Command -> `{command:ls -1 {vaultPath}}`
-- Vault/File -> `{filePath}`
-- Date Picker -> `{date-picker}|format:yyyy-MM-dd`
-
-## Development
-
-```bash
-npm install
-npm run dev
-```
-
-Build for release:
-
-```bash
-npm run build
-```
-
-Build and copy the plugin into an Obsidian plugin folder:
-
-```bash
-npm run dev-deploy -- /absolute/path/to/.obsidian/plugins/obsidian-slasher
-```
-
-You can also set the destination once with an environment variable:
-
-```bash
-OBSIDIAN_PLUGIN_DEV_DIR=/absolute/path/to/.obsidian/plugins/obsidian-slasher npm run dev-deploy
-```
-
-Run tests:
-
-```bash
-npm test
-```
-
-## Safety Notes
-
-- Shell commands run locally on your machine.
-- Treat imported templates as code, not trusted content.
-- This plugin is intentionally desktop-only in v1.
+- Date -> `{{ today | format: "yyyy-MM-dd" }}`
+- Clipboard -> `{{ clipboard | replace_first: "replace", "this" }}`
+- Command -> `{% command %}ls -1 {{ vault_path }}{% endcommand %}`
+- Vault/File -> `{{ file_path }}`
+- Date Picker -> `{{ date_picker | format: "yyyy-MM-dd" }}`
