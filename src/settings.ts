@@ -206,8 +206,8 @@ export class SlasherSettingTab extends PluginSettingTab {
 			.setIcon("settings")
 			.setTooltip("Open template helper")
 			.onClick(() => {
-				new TemplateBuilderModal(this.app, async (snippet) => {
-					await this.insertSnippet(command, snippet);
+				new TemplateBuilderModal(this.app, (snippet) => {
+					void this.insertSnippet(command, snippet);
 				}).open();
 			})
 			.extraSettingsEl.addClass("slasher-settings-helper-button");
@@ -220,12 +220,13 @@ export class SlasherSettingTab extends PluginSettingTab {
 			.setIcon("trash")
 			.setTooltip("Delete command")
 			.onClick(async () => {
-				await this.plugin.removeCommand(command.id);
+				await this.plugin.removeTemplateCommand(command.id);
 				this.display();
 			});
-		if (typeof deleteButton.setWarning === "function") {
-			deleteButton.setWarning();
-		}
+		const warningCapableDeleteButton = deleteButton as ExtraButtonComponent & {
+			setWarning?: () => ExtraButtonComponent;
+		};
+		warningCapableDeleteButton.setWarning?.();
 		deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
 
 	}

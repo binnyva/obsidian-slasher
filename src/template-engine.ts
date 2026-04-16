@@ -618,7 +618,7 @@ async function resolveVariable(
 				value: await requirePickedDate(context),
 			};
 		default:
-			throw new TemplateError(`Unsupported template variable: ${variable}`);
+			throw new TemplateError(`Unsupported template variable: ${String(variable)}`);
 	}
 }
 
@@ -682,7 +682,7 @@ function applyFilter(value: ResolvedValue, filter: FilterDescriptor): ResolvedVa
 				value: value.value.replace(createRegexFilterPattern(filter, false), filter.arguments[1] ?? ""),
 			};
 		default:
-			throw new TemplateError(`Unsupported filter: ${filter.name}`);
+			throw new TemplateError(`Unsupported filter: ${String(filter.name)}`);
 	}
 }
 

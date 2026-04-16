@@ -2245,7 +2245,7 @@ async function resolveVariable(variable, context) {
         value: await requirePickedDate(context)
       };
     default:
-      throw new TemplateError(`Unsupported template variable: ${variable}`);
+      throw new TemplateError(`Unsupported template variable: ${String(variable)}`);
   }
 }
 async function requirePickedDate(context) {
@@ -2304,7 +2304,7 @@ function applyFilter(value, filter) {
         value: value.value.replace(createRegexFilterPattern(filter, false), filter.arguments[1] ?? "")
       };
     default:
-      throw new TemplateError(`Unsupported filter: ${filter.name}`);
+      throw new TemplateError(`Unsupported filter: ${String(filter.name)}`);
   }
 }
 function createRegexFilterPattern(filter, replaceAllMatches) {
@@ -2479,8 +2479,8 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
     });
     helperCell.setAttr("data-label", "Build");
     new import_obsidian2.ExtraButtonComponent(helperCell).setIcon("settings").setTooltip("Open template helper").onClick(() => {
-      new TemplateBuilderModal(this.app, async (snippet) => {
-        await this.insertSnippet(command, snippet);
+      new TemplateBuilderModal(this.app, (snippet) => {
+        void this.insertSnippet(command, snippet);
       }).open();
     }).extraSettingsEl.addClass("slasher-settings-helper-button");
     const actionCell = rowEl.createDiv({
@@ -2488,12 +2488,11 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
     });
     actionCell.setAttr("data-label", "Action");
     const deleteButton = new import_obsidian2.ExtraButtonComponent(actionCell).setIcon("trash").setTooltip("Delete command").onClick(async () => {
-      await this.plugin.removeCommand(command.id);
+      await this.plugin.removeTemplateCommand(command.id);
       this.display();
     });
-    if (typeof deleteButton.setWarning === "function") {
-      deleteButton.setWarning();
-    }
+    const warningCapableDeleteButton = deleteButton;
+    warningCapableDeleteButton.setWarning?.();
     deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
   }
   syncTextAreaHeight(textAreaEl) {
@@ -2530,7 +2529,7 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
   async onload() {
     await this.loadSettings();
     this.addSettingTab(new SlasherSettingTab(this));
-    await this.rebuildCommands();
+    this.rebuildCommands();
   }
   onunload() {
     this.clearRegisteredCommands();
@@ -2544,13 +2543,13 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
     });
     await this.saveSettings();
   }
-  async removeCommand(commandId) {
+  async removeTemplateCommand(commandId) {
     this.settings.commands = this.settings.commands.filter((command) => command.id !== commandId);
     await this.saveSettings();
   }
   async saveSettings() {
     await this.saveData(this.settings);
-    await this.rebuildCommands();
+    this.rebuildCommands();
   }
   async loadSettings() {
     const loaded = await this.loadData();
@@ -2578,7 +2577,7 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
     }
     return `template-command-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
-  async rebuildCommands() {
+  rebuildCommands() {
     this.clearRegisteredCommands();
     for (const command of this.settings.commands) {
       if (!command.enabled || validateTemplateCommand(command.name, command.template).length > 0) {

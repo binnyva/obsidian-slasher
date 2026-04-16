@@ -2,9 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import {
-	Editor,
 	FileSystemAdapter,
-	MarkdownFileInfo,
 	Notice,
 	Plugin,
 	TFile,
@@ -20,6 +18,7 @@ import {
 	TemplateError,
 	validateTemplateCommand,
 } from "./template-engine";
+import type { Editor, MarkdownFileInfo } from "obsidian";
 import type { FileContext, SlasherSettings, TemplateCommand, TemplateRuntimeContext, VaultContext } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -31,7 +30,7 @@ export default class SlasherPlugin extends Plugin {
 	override async onload(): Promise<void> {
 		await this.loadSettings();
 		this.addSettingTab(new SlasherSettingTab(this));
-		await this.rebuildCommands();
+		this.rebuildCommands();
 	}
 
 	override onunload(): void {
@@ -49,18 +48,18 @@ export default class SlasherPlugin extends Plugin {
 		await this.saveSettings();
 	}
 
-	async removeCommand(commandId: string): Promise<void> {
+	async removeTemplateCommand(commandId: string): Promise<void> {
 		this.settings.commands = this.settings.commands.filter((command) => command.id !== commandId);
 		await this.saveSettings();
 	}
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-		await this.rebuildCommands();
+		this.rebuildCommands();
 	}
 
 	private async loadSettings(): Promise<void> {
-		const loaded = await this.loadData();
+		const loaded: unknown = await this.loadData();
 		const defaults = createDefaultSettings();
 
 		if (!loaded || typeof loaded !== "object") {
@@ -95,7 +94,7 @@ export default class SlasherPlugin extends Plugin {
 		return `template-command-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 	}
 
-	private async rebuildCommands(): Promise<void> {
+	private rebuildCommands(): void {
 		this.clearRegisteredCommands();
 
 		for (const command of this.settings.commands) {

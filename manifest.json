@@ -1,9 +1,9 @@
 {
   "id": "slasher",
   "name": "Slasher",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "1.6.0",
-  "description": "Create custom slash commands that insert rendered template output into the editor.",
+  "description": "Create custom slash commands that insert custom text based on templates. Insert dates, shell command output, processed clipboard content, and more.",
   "author": "binnyva",
   "isDesktopOnly": true
 }

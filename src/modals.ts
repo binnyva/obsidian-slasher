@@ -1,11 +1,9 @@
 import {
-	App,
 	ButtonComponent,
-	DropdownComponent,
 	Modal,
 	Setting,
-	TextComponent,
 } from "obsidian";
+import type { App, DropdownComponent, TextComponent } from "obsidian";
 
 export type BuilderSnippetKind = "date" | "clipboard" | "command" | "vault" | "date-picker";
 
