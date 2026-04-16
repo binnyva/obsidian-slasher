@@ -2190,16 +2190,21 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Slasher" });
-    containerEl.createEl("p", {
+    const layoutEl = containerEl.createDiv({ cls: "slasher-settings-layout" });
+    layoutEl.createEl("h2", {
+      cls: "slasher-settings-title",
+      text: "Slasher"
+    });
+    const introEl = layoutEl.createDiv({ cls: "slasher-settings-intro" });
+    introEl.createEl("p", {
       cls: "slasher-settings-help",
       text: "Each item becomes a normal Obsidian editor command, so it can appear in Slash commands and the command palette."
     });
-    containerEl.createEl("p", {
+    introEl.createEl("p", {
       cls: "slasher-settings-help",
       text: "Use the Add helper inside a row to insert starter snippets such as {today}|format:yyyy-MM-dd or {command:ls -1 {vaultPath}}."
     });
-    const tableEl = containerEl.createDiv({ cls: "slasher-settings-table" });
+    const tableEl = layoutEl.createDiv({ cls: "slasher-settings-table" });
     const headerEl = tableEl.createDiv({ cls: "slasher-settings-table-header" });
     headerEl.createDiv({
       cls: "slasher-settings-table-heading",
@@ -2232,7 +2237,7 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
         this.renderCommandRow(bodyEl, command);
       }
     }
-    const footerEl = containerEl.createDiv({ cls: "slasher-settings-footer" });
+    const footerEl = layoutEl.createDiv({ cls: "slasher-settings-footer" });
     this.renderAddRowButton(footerEl, "+ Add row");
   }
   renderAddRowButton(parentEl, label) {

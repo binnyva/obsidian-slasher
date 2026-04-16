@@ -28,17 +28,24 @@ export class SlasherSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl("h2", { text: "Slasher" });
-		containerEl.createEl("p", {
-			cls: "slasher-settings-help",
-			text: "Each item becomes a normal Obsidian editor command, so it can appear in Slash commands and the command palette.",
-		});
-		containerEl.createEl("p", {
-			cls: "slasher-settings-help",
-			text: "Use the Add helper inside a row to insert starter snippets such as {today}|format:yyyy-MM-dd or {command:ls -1 {vaultPath}}.",
+		const layoutEl = containerEl.createDiv({ cls: "slasher-settings-layout" });
+		layoutEl.createEl("h2", {
+			cls: "slasher-settings-title",
+			text: "Slasher",
 		});
 
-		const tableEl = containerEl.createDiv({ cls: "slasher-settings-table" });
+		const introEl = layoutEl.createDiv({ cls: "slasher-settings-intro" });
+		introEl.createEl("p", {
+			cls: "slasher-settings-help",
+			text: "Use the Add helper inside a row to insert starter snippets such as {today}|format:yyyy-MM-dd or {command:ls -1 {vaultPath}}. ",
+		});
+		introEl.createEl("a", {
+			cls: "slasher-settings-help-link",
+			href: "https://github.com/binnyva/obsidian-slasher",
+			text: "Documentation",
+		});
+
+		const tableEl = layoutEl.createDiv({ cls: "slasher-settings-table" });
 		const headerEl = tableEl.createDiv({ cls: "slasher-settings-table-header" });
 		headerEl.createDiv({
 			cls: "slasher-settings-table-heading",
@@ -74,7 +81,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 			}
 		}
 
-		const footerEl = containerEl.createDiv({ cls: "slasher-settings-footer" });
+		const footerEl = layoutEl.createDiv({ cls: "slasher-settings-footer" });
 		this.renderAddRowButton(footerEl, "+ Add row");
 	}
 

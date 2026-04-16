@@ -1,7 +1,12 @@
+.slasher-settings-title {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 .slasher-settings-help {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
-  margin: 0 0 12px;
+  margin: 0;
 }
 
 .slasher-settings-table {
@@ -124,7 +129,7 @@
 .slasher-settings-footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .slasher-validation {
