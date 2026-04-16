@@ -6,7 +6,7 @@ If you want to use this with the slash command, than the Slash Command core plug
 
 You can also [set custom keyboard shortcuts for your custom commands](https://obsidian.md/help/hotkeys).
 
-![Sample Use case](https://github.com/user-attachments/assets/b6558959-efb7-49cf-9c55-77a9d90e99e5)
+![Sample Use Case](./docs/assets/slash-commands.gif)
 
 ## Template Syntax and Example Use Cases
 
