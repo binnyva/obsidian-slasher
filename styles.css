@@ -1,7 +1,3 @@
-.slasher-settings-title {
-  padding: 0 !important;
-}
-
 .slasher-settings-help {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
@@ -104,7 +100,7 @@
 }
 
 .slasher-settings-textarea {
-  min-height: 38px;
+  min-height: 76px;
   resize: vertical;
   line-height: 1.5;
 }
@@ -144,6 +140,14 @@
 .slasher-modal-grid {
   display: grid;
   gap: 12px;
+}
+
+.slasher-modal-helper-text {
+  margin-bottom: 0;
+}
+
+.slasher-modal-text-input {
+  width: 100%;
 }
 
 .slasher-modal-actions {

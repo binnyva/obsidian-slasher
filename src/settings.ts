@@ -29,20 +29,16 @@ export class SlasherSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		const layoutEl = containerEl.createDiv({ cls: "slasher-settings-layout" });
-		layoutEl.createEl("h2", {
-			cls: "slasher-settings-title",
-			text: "Slasher",
-		});
 
 		const introEl = layoutEl.createDiv({ cls: "slasher-settings-intro" });
 		const helpEl = introEl.createEl("p", {
 			cls: "slasher-settings-help",
 		});
-		helpEl.appendText("Refer the ");
+		helpEl.appendText("See the ");
 		helpEl.createEl("a", {
 			cls: "slasher-settings-help-link",
 			href: "https://github.com/binnyva/obsidian-slasher",
-			text: "Documentation",
+			text: "documentation",
 		});
 		helpEl.appendText(" for template string format.");
 
@@ -54,7 +50,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 		});
 		headerEl.createDiv({
 			cls: "slasher-settings-table-heading",
-			text: "Command Name",
+			text: "Command name",
 		});
 		headerEl.createDiv({
 			cls: "slasher-settings-table-heading",
@@ -83,7 +79,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 		}
 
 		const footerEl = layoutEl.createDiv({ cls: "slasher-settings-footer" });
-		this.renderAddRowButton(footerEl, "+ Add row");
+		this.renderAddRowButton(footerEl, "Add row");
 	}
 
 	private renderAddRowButton(parentEl: HTMLElement, label: string): void {
@@ -151,7 +147,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 		const commandCell = rowEl.createDiv({
 			cls: "slasher-settings-cell slasher-settings-cell--name",
 		});
-		commandCell.setAttr("data-label", "Command Name");
+		commandCell.setAttr("data-label", "Command name");
 
 		new TextComponent(commandCell)
 			.setPlaceholder("Insert tomorrow's date")
@@ -178,9 +174,8 @@ export class SlasherSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			});
 
-		textArea.inputEl.rows = 1;
+		textArea.inputEl.rows = 3;
 		textArea.inputEl.addClass("slasher-settings-textarea");
-		this.syncTextAreaHeight(textArea.inputEl);
 
 		const updateSelection = () => {
 			this.selectionByCommandId.set(command.id, {
@@ -189,10 +184,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 			});
 		};
 
-		textArea.inputEl.addEventListener("input", () => {
-			this.syncTextAreaHeight(textArea.inputEl);
-			updateSelection();
-		});
+		textArea.inputEl.addEventListener("input", updateSelection);
 		textArea.inputEl.addEventListener("click", updateSelection);
 		textArea.inputEl.addEventListener("keyup", updateSelection);
 		textArea.inputEl.addEventListener("select", updateSelection);
@@ -228,12 +220,6 @@ export class SlasherSettingTab extends PluginSettingTab {
 		};
 		warningCapableDeleteButton.setWarning?.();
 		deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
-
-	}
-
-	private syncTextAreaHeight(textAreaEl: HTMLTextAreaElement): void {
-		textAreaEl.style.height = "auto";
-		textAreaEl.style.height = `${Math.max(textAreaEl.scrollHeight, 44)}px`;
 	}
 
 	private async insertSnippet(command: TemplateCommand, snippet: string): Promise<void> {

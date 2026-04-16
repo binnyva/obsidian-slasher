@@ -156,3 +156,11 @@ All commands you have added are listed in the Settings page.
 Each row also keeps an enabled toggle beside the command name, and the template cell includes an `⚙︎` button.
 
 The `⚙︎` is just a template builder - you can use it to build the template you want without knowing the template format.
+
+## Disclosures
+
+- Desktop-only plugin.
+- Supports running user-authored local shell commands from templates.
+- Reads clipboard contents only when a template uses `{{ clipboard }}`.
+- Exposes absolute vault and file paths to templates such as `{{ vault_path }}` and `{{ file_path }}`.
+- Does not send network requests, include telemetry, require accounts, show ads, or process payments.

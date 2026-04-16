@@ -74,11 +74,10 @@ export class TemplateBuilderModal extends Modal {
 		let pickerFormat = "yyyy-MM-dd";
 
 		const form = contentEl.createDiv({ cls: "slasher-modal-grid" });
-		const helperText = form.createEl("p", {
-			cls: "slasher-settings-help",
+		form.createEl("p", {
+			cls: "slasher-settings-help slasher-modal-helper-text",
 			text: "The helper inserts a starter snippet into the Template field. You can edit it freely afterwards.",
 		});
-		helperText.style.marginBottom = "0";
 
 		const dynamicSection = form.createDiv();
 
@@ -86,18 +85,18 @@ export class TemplateBuilderModal extends Modal {
 			dynamicSection.empty();
 
 			new Setting(dynamicSection)
-				.setName("Snippet type")
-				.setDesc("Choose the kind of snippet to generate.")
-				.addDropdown((dropdown: DropdownComponent) => {
-					dropdown
-						.addOption("date", "Date")
-						.addOption("clipboard", "Clipboard")
-						.addOption("command", "Command")
-						.addOption("vault", "Vault/File")
-						.addOption("date-picker", "Date Picker")
-						.setValue(snippetKind)
-						.onChange((value) => {
-							snippetKind = value as BuilderSnippetKind;
+					.setName("Snippet type")
+					.setDesc("Choose the kind of snippet to generate.")
+					.addDropdown((dropdown: DropdownComponent) => {
+						dropdown
+							.addOption("date", "Date")
+							.addOption("clipboard", "Clipboard")
+							.addOption("command", "Command")
+							.addOption("vault", "Vault/file")
+							.addOption("date-picker", "Date picker")
+							.setValue(snippetKind)
+							.onChange((value) => {
+								snippetKind = value as BuilderSnippetKind;
 							renderFields();
 						});
 				});
@@ -153,11 +152,12 @@ export class TemplateBuilderModal extends Modal {
 					.setDesc("You can include output tags like {{ vault_path }} inside the command body.")
 					.addText((text: TextComponent) => {
 						text.setPlaceholder("ls -1 {{ vault_path }}")
+							.inputEl.addClass("slasher-modal-text-input");
+						text
 							.setValue(commandBody)
 							.onChange((value) => {
 								commandBody = value;
 							});
-						text.inputEl.style.width = "100%";
 					});
 			}
 
