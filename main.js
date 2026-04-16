@@ -106,7 +106,7 @@ var TemplateBuilderModal = class extends import_obsidian.Modal {
         });
       }
       if (snippetKind === "clipboard") {
-        new import_obsidian.Setting(dynamicSection).setName("Replace").setDesc("Used to build a starter replace_first filter.").addText((text) => {
+        new import_obsidian.Setting(dynamicSection).setName("Replace").setDesc("Used to build a starter replace_first filter. Regex replacements are also available in templates.").addText((text) => {
           text.setValue(replaceFrom).onChange((value) => {
             replaceFrom = value;
           });
@@ -1786,7 +1786,9 @@ var TEMPLATE_VARIABLES = /* @__PURE__ */ new Set([
 var FILTER_ARGUMENT_COUNTS = {
   format: 1,
   replace: 2,
-  replace_first: 2
+  replace_first: 2,
+  replace_regex: 2,
+  replace_first_regex: 2
 };
 var TemplateError = class extends Error {
   constructor(message2) {
@@ -2031,7 +2033,11 @@ function parseFilter(source) {
   const expectedArgumentCount = FILTER_ARGUMENT_COUNTS[name];
   const argsSource = colonIndex === -1 ? "" : source.slice(colonIndex + 1).trim();
   const args = argsSource ? parseFilterArguments(argsSource) : [];
-  if (args.length !== expectedArgumentCount) {
+  if (name === "replace_regex" || name === "replace_first_regex") {
+    if (args.length < expectedArgumentCount || args.length > expectedArgumentCount + 1) {
+      throw new TemplateError(`${name} requires 2 or 3 arguments.`);
+    }
+  } else if (args.length !== expectedArgumentCount) {
     const suffix = expectedArgumentCount === 1 ? "" : "s";
     throw new TemplateError(`${name} requires ${expectedArgumentCount} argument${suffix}.`);
   }
@@ -2277,9 +2283,42 @@ function applyFilter(value, filter) {
         kind: "string",
         value: value.value.replace(filter.arguments[0] ?? "", filter.arguments[1] ?? "")
       };
+    case "replace_regex":
+      if (value.kind !== "string") {
+        throw new TemplateError("replace_regex can only be used with string values.");
+      }
+      return {
+        kind: "string",
+        value: value.value.replaceAll(createRegexFilterPattern(filter, true), filter.arguments[1] ?? "")
+      };
+    case "replace_first_regex":
+      if (value.kind !== "string") {
+        throw new TemplateError("replace_first_regex can only be used with string values.");
+      }
+      return {
+        kind: "string",
+        value: value.value.replace(createRegexFilterPattern(filter, false), filter.arguments[1] ?? "")
+      };
     default:
       throw new TemplateError(`Unsupported filter: ${filter.name}`);
   }
+}
+function createRegexFilterPattern(filter, replaceAllMatches) {
+  const source = filter.arguments[0] ?? "";
+  const rawFlags = filter.arguments[2] ?? "";
+  const flags = replaceAllMatches ? ensureRegexFlag(rawFlags, "g") : removeRegexFlag(rawFlags, "g");
+  try {
+    return new RegExp(source, flags);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Invalid regex.";
+    throw new TemplateError(`Invalid regular expression for ${filter.name}: ${reason}`);
+  }
+}
+function ensureRegexFlag(flags, flag) {
+  return flags.includes(flag) ? flags : `${flags}${flag}`;
+}
+function removeRegexFlag(flags, flag) {
+  return [...flags].filter((value) => value !== flag).join("");
 }
 function shellEscape(value) {
   return `'${value.replace(/'/g, `'"'"'`)}'`;

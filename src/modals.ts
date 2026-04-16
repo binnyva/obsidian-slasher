@@ -133,7 +133,7 @@ export class TemplateBuilderModal extends Modal {
 			if (snippetKind === "clipboard") {
 				new Setting(dynamicSection)
 					.setName("Replace")
-					.setDesc("Used to build a starter replace_first filter.")
+					.setDesc("Used to build a starter replace_first filter. Regex replacements are also available in templates.")
 					.addText((text) => {
 						text.setValue(replaceFrom).onChange((value) => {
 							replaceFrom = value;

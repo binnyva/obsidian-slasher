@@ -9,6 +9,7 @@ Templates are freeform text. Mix plain text with dynamic tokens:
 ```text
 Tomorrow: {{ tomorrow | format: "yyyy-MM-dd" }}
 Clipboard: {{ clipboard | replace: "foo", "bar" }}
+Clipboard regex: {{ clipboard | replace_regex: "\\d+", "#" }}
 Picked: {{ date_picker | format: "yyyy-MM-dd" }}
 Files:
 {% command %}ls -1 {{ vault_path }}{% endcommand %}
@@ -43,6 +44,8 @@ Example:
 ```text
 {{ clipboard | replace_first: "replace", "this" }}
 {{ clipboard | replace: "foo", "bar" | replace: "baz", "qux" }}
+{{ clipboard | replace_regex: "\\d+", "#" }}
+{{ clipboard | replace_first_regex: "foo\\s+bar", "baz", "i" }}
 ```
 
 #### Vault and file variables
@@ -117,6 +120,24 @@ Replaces only the first literal match in string values:
 
 ```text
 {{ clipboard | replace_first: "from", "to" }}
+```
+
+#### `replace_regex`
+
+Replaces all regex matches in string values. The third argument is optional regex flags; `g` is applied automatically:
+
+```text
+{{ clipboard | replace_regex: "\\d+", "#" }}
+{{ clipboard | replace_regex: "foo\\s+bar", "baz", "i" }}
+```
+
+#### `replace_first_regex`
+
+Replaces only the first regex match in string values. The third argument is optional regex flags; any `g` flag is ignored:
+
+```text
+{{ clipboard | replace_first_regex: "\\d+", "#" }}
+{{ clipboard | replace_first_regex: "foo\\s+bar", "baz", "i" }}
 ```
 
 ## Settings UI

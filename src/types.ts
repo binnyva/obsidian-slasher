@@ -66,7 +66,12 @@ export interface FilterDescriptor {
 	arguments: string[];
 }
 
-export type FilterName = "format" | "replace" | "replace_first";
+export type FilterName =
+	| "format"
+	| "replace"
+	| "replace_first"
+	| "replace_regex"
+	| "replace_first_regex";
 
 export type TemplateVariableName =
 	| "today"

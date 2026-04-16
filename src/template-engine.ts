@@ -48,6 +48,8 @@ const FILTER_ARGUMENT_COUNTS: Record<FilterDescriptor["name"], number> = {
 	format: 1,
 	replace: 2,
 	replace_first: 2,
+	replace_regex: 2,
+	replace_first_regex: 2,
 };
 
 export class TemplateError extends Error {
@@ -351,7 +353,11 @@ function parseFilter(source: string): FilterDescriptor {
 	const argsSource = colonIndex === -1 ? "" : source.slice(colonIndex + 1).trim();
 	const args = argsSource ? parseFilterArguments(argsSource) : [];
 
-	if (args.length !== expectedArgumentCount) {
+	if (name === "replace_regex" || name === "replace_first_regex") {
+		if (args.length < expectedArgumentCount || args.length > expectedArgumentCount + 1) {
+			throw new TemplateError(`${name} requires 2 or 3 arguments.`);
+		}
+	} else if (args.length !== expectedArgumentCount) {
 		const suffix = expectedArgumentCount === 1 ? "" : "s";
 		throw new TemplateError(`${name} requires ${expectedArgumentCount} argument${suffix}.`);
 	}
@@ -654,9 +660,48 @@ function applyFilter(value: ResolvedValue, filter: FilterDescriptor): ResolvedVa
 				kind: "string",
 				value: value.value.replace(filter.arguments[0] ?? "", filter.arguments[1] ?? ""),
 			};
+		case "replace_regex":
+			if (value.kind !== "string") {
+				throw new TemplateError("replace_regex can only be used with string values.");
+			}
+			return {
+				kind: "string",
+				value: value.value.replaceAll(createRegexFilterPattern(filter, true), filter.arguments[1] ?? ""),
+			};
+		case "replace_first_regex":
+			if (value.kind !== "string") {
+				throw new TemplateError("replace_first_regex can only be used with string values.");
+			}
+			return {
+				kind: "string",
+				value: value.value.replace(createRegexFilterPattern(filter, false), filter.arguments[1] ?? ""),
+			};
 		default:
 			throw new TemplateError(`Unsupported filter: ${filter.name}`);
 	}
+}
+
+function createRegexFilterPattern(filter: FilterDescriptor, replaceAllMatches: boolean): RegExp {
+	const source = filter.arguments[0] ?? "";
+	const rawFlags = filter.arguments[2] ?? "";
+	const flags = replaceAllMatches
+		? ensureRegexFlag(rawFlags, "g")
+		: removeRegexFlag(rawFlags, "g");
+
+	try {
+		return new RegExp(source, flags);
+	} catch (error) {
+		const reason = error instanceof Error ? error.message : "Invalid regex.";
+		throw new TemplateError(`Invalid regular expression for ${filter.name}: ${reason}`);
+	}
+}
+
+function ensureRegexFlag(flags: string, flag: string): string {
+	return flags.includes(flag) ? flags : `${flags}${flag}`;
+}
+
+function removeRegexFlag(flags: string, flag: string): string {
+	return [...flags].filter((value) => value !== flag).join("");
 }
 
 export function shellEscape(value: string): string {

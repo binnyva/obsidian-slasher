@@ -68,6 +68,42 @@ test("renderTemplate chains replace filters", async () => {
 	assert.equal(output, "copied text");
 });
 
+test("renderTemplate supports global regex replacement filters", async () => {
+	const output = await renderTemplate(
+		'{{ clipboard | replace_regex: "[aeiou]", "*" }}',
+		createContext(),
+	);
+
+	assert.equal(output, "cl*pb**rd v*l**");
+});
+
+test("renderTemplate supports regex replacement flags", async () => {
+	const output = await renderTemplate(
+		'{{ clipboard | replace_regex: "CLIPBOARD", "copied", "i" }}',
+		createContext(),
+	);
+
+	assert.equal(output, "copied value");
+});
+
+test("renderTemplate replaces only the first regex match when requested", async () => {
+	const output = await renderTemplate(
+		'{{ clipboard | replace_first_regex: "[aeiou]", "*" }}',
+		createContext(),
+	);
+
+	assert.equal(output, "cl*pboard value");
+});
+
+test("renderTemplate rejects invalid regex filters", async () => {
+	await assert.rejects(
+		() => renderTemplate('{{ clipboard | replace_regex: "[", "x" }}', createContext()),
+		(error) =>
+			error instanceof TemplateError &&
+			error.message.startsWith("Invalid regular expression for replace_regex:"),
+	);
+});
+
 test("renderShellCommandTemplate shell-escapes nested placeholders", async () => {
 	const output = await renderShellCommandTemplate(
 		"printf %s {{ vault_path }} {{ file_name }}",
