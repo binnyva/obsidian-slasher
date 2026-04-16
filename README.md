@@ -6,10 +6,7 @@ If you want to use this with the slash command, than the Slash Command core plug
 
 You can also [set custom keyboard shortcuts for your custom commands](https://obsidian.md/help/hotkeys).
 
-<video width="640" height="360" controls>
-  <source src="./docs/assets/slash-commands.mov?raw=true" type="video/quicktime">
-  Your browser does not support the video tag.
-</video>
+![Sample Use case](https://github.com/user-attachments/assets/b6558959-efb7-49cf-9c55-77a9d90e99e5)
 
 ## Template Syntax and Example Use Cases
 
