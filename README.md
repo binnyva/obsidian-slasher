@@ -1,4 +1,4 @@
-# Slasher
+# Slasher Obsidian Plugin
 
 Slasher lets you create custom editor commands that appear in Obsidian's command system, which also makes them available from Slash commands. Each command has a name and a template. Template string decides what actually shows up in the editor.
 
@@ -6,22 +6,23 @@ If you want to use this with the slash command, than the Slash Command core plug
 
 You can also [set custom keyboard shortcuts for your custom commands](https://obsidian.md/help/hotkeys).
 
-## Template Syntax
+![Sample Use Case](./docs/assets/slash-commands.mov?raw=true)
+
+## Template Syntax and Example Use Cases
 
 Templates are freeform text. Mix plain text with dynamic tokens:
 
-```text
-Tomorrow: {{ tomorrow | format: "yyyy-MM-dd" }}
-Clipboard: {{ clipboard | replace: "foo", "bar" }}
-Clipboard regex: {{ clipboard | replace_regex: "\\d+", "#" }}
-Picked: {{ date_picker | format: "yyyy-MM-dd" }}
-Files:
-{% command %}ls -1 {{ vault_path }}{% endcommand %}
-```
+- Link to tomorrow's note: `[[{{ tomorrow | format: "yyyy-MM-dd" }}]]`
+- Link to date picker note: `[[{{ date_picker | format: "yyyy-MM-dd" }}]]`
+- Document last updated on: `Document Last Updated on {{ file_modification_date | format: "MMM do, yyyy" }}`
+- Vault Notes Count: `{% command %}find {{ vault_path }} -type f -name "*.md" | wc -l{% endcommand %}`
+- Word count: `{% command %}wc -w < {{file_path}}{% endcommand %}`
+- Trimmed Clipboard: `{{ clipboard | replace_regex: "^\s+", "" | replace_regex: "\s+$", "" }}`
+- Total Notes Count: `{% command %}find {{ vault_path }} -type f -name "*.md" | wc -l{% endcommand %}`
 
-### Supported Variables
+## Supported Variables
 
-#### Date variables
+### Date variables
 
 - `{{ today }}`
 - `{{ tomorrow }}`
@@ -37,9 +38,11 @@ Date values must use the `format` filter before insertion:
 {{ file_modification_date | format: "PPP" }}
 ```
 
-Important: use `MM` for months. `mm` means minutes in date-fns.
+Important: use `MM` for months. `mm` means minutes in date-fns. 
 
-#### Clipboard variable
+For more options, check the [date-fns format documentation](https://date-fns.org/docs/format).
+
+### Clipboard variable
 
 - `{{ clipboard }}`
 
@@ -48,11 +51,11 @@ Example:
 ```text
 {{ clipboard | replace_first: "replace", "this" }}
 {{ clipboard | replace: "foo", "bar" | replace: "baz", "qux" }}
-{{ clipboard | replace_regex: "\\d+", "#" }}
-{{ clipboard | replace_first_regex: "foo\\s+bar", "baz", "i" }}
+{{ clipboard | replace_regex: "\d+", "#" }}
+{{ clipboard | replace_first_regex: "foo\s+bar", "baz", "i" }}
 ```
 
-#### Vault and file variables
+### Vault and file variables
 
 - `{{ file_path }}`
 - `{{ file_name }}`
@@ -63,7 +66,7 @@ Example:
 
 `{{ file_path }}` resolves to the note's absolute filesystem path. File-scoped variables require an active file. If no file is active, the command shows a Notice and inserts nothing.
 
-#### Shell command tag
+### Shell command
 
 - `{% command %}...{% endcommand %}`
 
@@ -71,7 +74,7 @@ Example:
 
 ```text
 {% command %}ls -1 {{ vault_path }}{% endcommand %}
-{% command %}wc -w "{{ file_path }}"{% endcommand %}
+{% command %}wc -w {{ file_path }}{% endcommand %}
 ```
 
 Nested Liquid output tags inside the command body are resolved before the shell command runs. Inserted values are shell-escaped.
@@ -82,10 +85,9 @@ Shell commands are executed with:
 - `-lc`
 - the vault path as the working directory
 
-If the command exits with a non-zero status, the plugin shows a Notice and inserts nothing.
-Successful command output is trimmed before insertion.
+If the command exits with a non-zero status, the plugin shows a notice and inserts nothing.
 
-#### Date picker variable
+### Date picker
 
 - `{{ date_picker | format: "yyyy-MM-dd" }}`
 
@@ -147,21 +149,10 @@ Replaces only the first regex match in string values. The third argument is opti
 
 ## Settings UI
 
-The settings tab lists all configured commands in a table layout with:
+![Sample Settings](./docs/assets/settings.png?raw=true)
 
-- command name
-- template
-- delete action
-- add-row control at the bottom
+All commands you have added are listed in the Settings page.
 
-Each row also keeps an enabled toggle beside the command name, and the template cell includes an `Add helper` button.
+Each row also keeps an enabled toggle beside the command name, and the template cell includes an `⚙︎` button.
 
-The `Add helper` is just a snippet builder. It inserts starter template text at the current cursor position inside the Template field. It does not add extra saved fields.
-
-Builder examples:
-
-- Date -> `{{ today | format: "yyyy-MM-dd" }}`
-- Clipboard -> `{{ clipboard | replace_first: "replace", "this" }}`
-- Command -> `{% command %}ls -1 {{ vault_path }}{% endcommand %}`
-- Vault/File -> `{{ file_path }}`
-- Date Picker -> `{{ date_picker | format: "yyyy-MM-dd" }}`
+The `⚙︎` is just a template builder - you can use it to build the template you want without knowing the template format.
