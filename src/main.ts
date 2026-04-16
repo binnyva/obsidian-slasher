@@ -12,6 +12,7 @@ import {
 
 import { DatePickerModal } from "./modals";
 import { SlasherSettingTab } from "./settings";
+import { trimShellOutput } from "./shell-output";
 import {
 	buildCommandRegistrationId,
 	createDefaultSettings,
@@ -179,8 +180,13 @@ export default class SlasherPlugin extends Plugin {
 			return undefined;
 		}
 
+		const adapter = this.app.vault.adapter;
+		if (!(adapter instanceof FileSystemAdapter)) {
+			throw new TemplateError("This plugin requires the desktop file system adapter.");
+		}
+
 		return {
-			path: activeFile.path,
+			path: adapter.getFullPath(activeFile.path),
 			name: activeFile.name,
 			stem: activeFile.basename,
 			folderPath: activeFile.parent?.path === "/" ? "" : activeFile.parent?.path ?? "",
@@ -213,7 +219,7 @@ export default class SlasherPlugin extends Plugin {
 				cwd: vault.path,
 				maxBuffer: 1024 * 1024,
 			});
-			return stdout.replace(/\r?\n$/, "");
+			return trimShellOutput(stdout);
 		} catch (error) {
 			throw new TemplateError(
 				error instanceof Error && error.message

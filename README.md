@@ -2,6 +2,10 @@
 
 Slasher lets you create custom editor commands that appear in Obsidian's command system, which also makes them available from Slash commands. Each command has a name and a template. Template string decides what actually shows up in the editor.
 
+If you want to use this with the slash command, than the Slash Command core plugin needs to be turned ON. You can find that at Obsidian > Settings > Core Plugins > Slash Commands - turn this ON.
+
+You can also [set custom keyboard shortcuts for your custom commands](https://obsidian.md/help/hotkeys).
+
 ## Template Syntax
 
 Templates are freeform text. Mix plain text with dynamic tokens:
@@ -57,7 +61,7 @@ Example:
 - `{{ vault_path }}`
 - `{{ vault_name }}`
 
-File-scoped variables require an active file. If no file is active, the command shows a Notice and inserts nothing.
+`{{ file_path }}` resolves to the note's absolute filesystem path. File-scoped variables require an active file. If no file is active, the command shows a Notice and inserts nothing.
 
 #### Shell command tag
 
@@ -67,7 +71,7 @@ Example:
 
 ```text
 {% command %}ls -1 {{ vault_path }}{% endcommand %}
-{% command %}printf "%s" {{ file_name }}{% endcommand %}
+{% command %}wc -w "{{ file_path }}"{% endcommand %}
 ```
 
 Nested Liquid output tags inside the command body are resolved before the shell command runs. Inserted values are shell-escaped.
@@ -79,6 +83,7 @@ Shell commands are executed with:
 - the vault path as the working directory
 
 If the command exits with a non-zero status, the plugin shows a Notice and inserts nothing.
+Successful command output is trimmed before insertion.
 
 #### Date picker variable
 
@@ -127,8 +132,8 @@ Replaces only the first literal match in string values:
 Replaces all regex matches in string values. The third argument is optional regex flags; `g` is applied automatically:
 
 ```text
-{{ clipboard | replace_regex: "\\d+", "#" }}
-{{ clipboard | replace_regex: "foo\\s+bar", "baz", "i" }}
+{{ clipboard | replace_regex: "\d+", "#" }}
+{{ clipboard | replace_regex: "foo\s+bar", "baz", "i" }}
 ```
 
 #### `replace_first_regex`
@@ -136,8 +141,8 @@ Replaces all regex matches in string values. The third argument is optional rege
 Replaces only the first regex match in string values. The third argument is optional regex flags; any `g` flag is ignored:
 
 ```text
-{{ clipboard | replace_first_regex: "\\d+", "#" }}
-{{ clipboard | replace_first_regex: "foo\\s+bar", "baz", "i" }}
+{{ clipboard | replace_first_regex: "\d+", "#" }}
+{{ clipboard | replace_first_regex: "foo\s+bar", "baz", "i" }}
 ```
 
 ## Settings UI

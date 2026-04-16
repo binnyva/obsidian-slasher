@@ -19,7 +19,7 @@ function createContext(overrides: Partial<TemplateRuntimeContext> = {}): Templat
 			name: "My Vault",
 		},
 		file: {
-			path: "Daily/Note.md",
+			path: "/vault/root/Daily/Note.md",
 			name: "Note.md",
 			stem: "Note",
 			folderPath: "Daily",
@@ -56,7 +56,7 @@ test("renderTemplate supports mixed placeholders and text", async () => {
 		createContext(),
 	);
 
-	assert.equal(output, "Tomorrow: 2026-04-16 in Daily/Note.md");
+	assert.equal(output, "Tomorrow: 2026-04-16 in /vault/root/Daily/Note.md");
 });
 
 test("renderTemplate chains replace filters", async () => {
@@ -95,6 +95,38 @@ test("renderTemplate replaces only the first regex match when requested", async 
 	assert.equal(output, "cl*pboard value");
 });
 
+test("renderTemplate preserves regex escapes in quoted string arguments", async () => {
+	const digitsOutput = await renderTemplate(
+		String.raw`{{ clipboard | replace_regex: "\d+", "#" }}`,
+		createContext({
+			readClipboard: async () => "order 123",
+		}),
+	);
+	const whitespaceOutput = await renderTemplate(
+		String.raw`{{ clipboard | replace_regex: "foo\s+bar", "baz" }}`,
+		createContext({
+			readClipboard: async () => "foo   bar",
+		}),
+	);
+
+	assert.equal(digitsOutput, "order #");
+	assert.equal(whitespaceOutput, "baz");
+});
+
+test("renderTemplate only unescapes matching quotes and literal backslashes", async () => {
+	const escapedQuoteOutput = await renderTemplate(
+		'{{ clipboard | replace: "clipboard", "copied \\"value\\"" }}',
+		createContext(),
+	);
+	const literalBackslashOutput = await renderTemplate(
+		String.raw`{{ clipboard | replace: "clipboard", "folder\\name" }}`,
+		createContext(),
+	);
+
+	assert.equal(escapedQuoteOutput, 'copied "value" value');
+	assert.equal(literalBackslashOutput, "folder\\name value");
+});
+
 test("renderTemplate rejects invalid regex filters", async () => {
 	await assert.rejects(
 		() => renderTemplate('{{ clipboard | replace_regex: "[", "x" }}', createContext()),
@@ -111,6 +143,12 @@ test("renderShellCommandTemplate shell-escapes nested placeholders", async () =>
 	);
 
 	assert.equal(output, "printf %s '/vault/root' 'Note.md'");
+});
+
+test("renderShellCommandTemplate passes the absolute file path", async () => {
+	const output = await renderShellCommandTemplate("wc -w {{ file_path }}", createContext());
+
+	assert.equal(output, "wc -w '/vault/root/Daily/Note.md'");
 });
 
 test("renderTemplate executes command blocks", async () => {

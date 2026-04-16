@@ -35,15 +35,16 @@ export class SlasherSettingTab extends PluginSettingTab {
 		});
 
 		const introEl = layoutEl.createDiv({ cls: "slasher-settings-intro" });
-		introEl.createEl("p", {
+		const helpEl = introEl.createEl("p", {
 			cls: "slasher-settings-help",
-			text: 'Use the Add helper inside a row to insert starter snippets such as {{ today | format: "yyyy-MM-dd" }}, {{ date_picker | format: "yyyy-MM-dd" }}, or {% command %}ls -1 {{ vault_path }}{% endcommand %}. ',
 		});
-		introEl.createEl("a", {
+		helpEl.appendText("Refer the ");
+		helpEl.createEl("a", {
 			cls: "slasher-settings-help-link",
 			href: "https://github.com/binnyva/obsidian-slasher",
 			text: "Documentation",
 		});
+		helpEl.appendText(" for template string format.");
 
 		const tableEl = layoutEl.createDiv({ cls: "slasher-settings-table" });
 		const headerEl = tableEl.createDiv({ cls: "slasher-settings-table-header" });
@@ -112,10 +113,27 @@ export class SlasherSettingTab extends PluginSettingTab {
 			rowEl.addClass("is-disabled");
 		}
 
-		const issues = validateTemplateCommand(command.name, command.template);
-		if (issues.length > 0) {
-			rowEl.addClass("is-invalid");
-		}
+		let validationEl: HTMLDivElement | null = null;
+		const refreshValidation = () => {
+			const issues = validateTemplateCommand(command.name, command.template);
+			rowEl.toggleClass("is-invalid", issues.length > 0);
+
+			if (issues.length === 0) {
+				validationEl?.remove();
+				validationEl = null;
+				return;
+			}
+
+			if (!validationEl) {
+				validationEl = rowEl.createDiv({
+					cls: "slasher-validation slasher-settings-validation",
+				});
+			}
+
+			validationEl.setText(issues.join(" "));
+		};
+
+		refreshValidation();
 
 		const enabledCell = rowEl.createDiv({
 			cls: "slasher-settings-cell slasher-settings-cell--enabled",
@@ -140,6 +158,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 			.setValue(command.name)
 			.onChange(async (value) => {
 				command.name = value;
+				refreshValidation();
 				await this.plugin.saveSettings();
 			})
 			.inputEl.addClass("slasher-settings-input");
@@ -155,6 +174,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 			.setValue(command.template)
 			.onChange(async (value) => {
 				command.template = value;
+				refreshValidation();
 				await this.plugin.saveSettings();
 			});
 
@@ -208,12 +228,6 @@ export class SlasherSettingTab extends PluginSettingTab {
 		}
 		deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
 
-		if (issues.length > 0) {
-			rowEl.createDiv({
-				cls: "slasher-validation slasher-settings-validation",
-				text: issues.join(" "),
-			});
-		}
 	}
 
 	private syncTextAreaHeight(textAreaEl: HTMLTextAreaElement): void {

@@ -412,7 +412,12 @@ function parseQuotedString(source: string, index: number): { value: string; next
 			if (nextCharacter === undefined) {
 				throw new TemplateError("Invalid escape sequence in string argument.");
 			}
-			value += nextCharacter;
+
+			if (nextCharacter === "\\" || nextCharacter === quote) {
+				value += nextCharacter;
+			} else {
+				value += `\\${nextCharacter}`;
+			}
 			cursor += 2;
 			continue;
 		}

@@ -2081,7 +2081,11 @@ function parseQuotedString(source, index) {
       if (nextCharacter === void 0) {
         throw new TemplateError("Invalid escape sequence in string argument.");
       }
-      value += nextCharacter;
+      if (nextCharacter === "\\" || nextCharacter === quote) {
+        value += nextCharacter;
+      } else {
+        value += `\\${nextCharacter}`;
+      }
       cursor += 2;
       continue;
     }
@@ -2340,15 +2344,16 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
       text: "Slasher"
     });
     const introEl = layoutEl.createDiv({ cls: "slasher-settings-intro" });
-    introEl.createEl("p", {
-      cls: "slasher-settings-help",
-      text: 'Use the Add helper inside a row to insert starter snippets such as {{ today | format: "yyyy-MM-dd" }}, {{ date_picker | format: "yyyy-MM-dd" }}, or {% command %}ls -1 {{ vault_path }}{% endcommand %}. '
+    const helpEl = introEl.createEl("p", {
+      cls: "slasher-settings-help"
     });
-    introEl.createEl("a", {
+    helpEl.appendText("Refer the ");
+    helpEl.createEl("a", {
       cls: "slasher-settings-help-link",
       href: "https://github.com/binnyva/obsidian-slasher",
       text: "Documentation"
     });
+    helpEl.appendText(" for template string format.");
     const tableEl = layoutEl.createDiv({ cls: "slasher-settings-table" });
     const headerEl = tableEl.createDiv({ cls: "slasher-settings-table-header" });
     headerEl.createDiv({
@@ -2407,10 +2412,23 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
     if (!command.enabled) {
       rowEl.addClass("is-disabled");
     }
-    const issues = validateTemplateCommand(command.name, command.template);
-    if (issues.length > 0) {
-      rowEl.addClass("is-invalid");
-    }
+    let validationEl = null;
+    const refreshValidation = () => {
+      const issues = validateTemplateCommand(command.name, command.template);
+      rowEl.toggleClass("is-invalid", issues.length > 0);
+      if (issues.length === 0) {
+        validationEl?.remove();
+        validationEl = null;
+        return;
+      }
+      if (!validationEl) {
+        validationEl = rowEl.createDiv({
+          cls: "slasher-validation slasher-settings-validation"
+        });
+      }
+      validationEl.setText(issues.join(" "));
+    };
+    refreshValidation();
     const enabledCell = rowEl.createDiv({
       cls: "slasher-settings-cell slasher-settings-cell--enabled"
     });
@@ -2426,6 +2444,7 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
     commandCell.setAttr("data-label", "Command Name");
     new import_obsidian2.TextComponent(commandCell).setPlaceholder("Insert tomorrow's date").setValue(command.name).onChange(async (value) => {
       command.name = value;
+      refreshValidation();
       await this.plugin.saveSettings();
     }).inputEl.addClass("slasher-settings-input");
     const templateCell = rowEl.createDiv({
@@ -2435,6 +2454,7 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
     const textArea = new import_obsidian2.TextAreaComponent(templateCell);
     textArea.setPlaceholder('{{ today | format: "yyyy-MM-dd" }}').setValue(command.template).onChange(async (value) => {
       command.template = value;
+      refreshValidation();
       await this.plugin.saveSettings();
     });
     textArea.inputEl.rows = 1;
@@ -2475,12 +2495,6 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
       deleteButton.setWarning();
     }
     deleteButton.extraSettingsEl.addClass("slasher-settings-delete-button");
-    if (issues.length > 0) {
-      rowEl.createDiv({
-        cls: "slasher-validation slasher-settings-validation",
-        text: issues.join(" ")
-      });
-    }
   }
   syncTextAreaHeight(textAreaEl) {
     textAreaEl.style.height = "auto";
@@ -2502,6 +2516,11 @@ var SlasherSettingTab = class extends import_obsidian2.PluginSettingTab {
     this.display();
   }
 };
+
+// src/shell-output.ts
+function trimShellOutput(output) {
+  return output.trim();
+}
 
 // src/main.ts
 var execFileAsync = (0, import_node_util.promisify)(import_node_child_process.execFile);
@@ -2625,8 +2644,12 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
     if (!(activeFile instanceof import_obsidian3.TFile)) {
       return void 0;
     }
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof import_obsidian3.FileSystemAdapter)) {
+      throw new TemplateError("This plugin requires the desktop file system adapter.");
+    }
     return {
-      path: activeFile.path,
+      path: adapter.getFullPath(activeFile.path),
       name: activeFile.name,
       stem: activeFile.basename,
       folderPath: activeFile.parent?.path === "/" ? "" : activeFile.parent?.path ?? "",
@@ -2652,7 +2675,7 @@ var SlasherPlugin = class extends import_obsidian3.Plugin {
         cwd: vault.path,
         maxBuffer: 1024 * 1024
       });
-      return stdout.replace(/\r?\n$/, "");
+      return trimShellOutput(stdout);
     } catch (error) {
       throw new TemplateError(
         error instanceof Error && error.message ? `Shell command failed: ${error.message}` : "Shell command failed."

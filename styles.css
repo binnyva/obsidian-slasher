@@ -8,6 +8,10 @@
   margin: 0;
 }
 
+.slasher-settings-intro {
+  margin-bottom: 12px;
+}
+
 .slasher-settings-table {
   border: 1px solid var(--background-modifier-border);
   border-radius: 16px;
@@ -128,7 +132,7 @@
 .slasher-settings-footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: 0;
+  margin-top: 16px;
 }
 
 .slasher-validation {
