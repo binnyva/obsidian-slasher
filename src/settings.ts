@@ -38,7 +38,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 		helpEl.createEl("a", {
 			cls: "slasher-settings-help-link",
 			href: "https://github.com/binnyva/obsidian-slasher",
-			text: "documentation",
+			text: "Documentation",
 		});
 		helpEl.appendText(" for template string format.");
 
@@ -88,7 +88,7 @@ export class SlasherSettingTab extends PluginSettingTab {
 			text: label,
 		});
 		buttonEl.type = "button";
-		buttonEl.addEventListener("click", async () => {
+		buttonEl.addEventListener("click", async (): Promise<void> => {
 			try {
 				await this.plugin.addEmptyCommand();
 				this.display();
