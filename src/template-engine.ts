@@ -710,5 +710,5 @@ function removeRegexFlag(flags: string, flag: string): string {
 }
 
 export function shellEscape(value: string): string {
-	return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+	return `'${value.replace(/'/g, `'"'"'`)}'`;
 }

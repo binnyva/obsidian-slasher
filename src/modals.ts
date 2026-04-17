@@ -76,7 +76,7 @@ export class TemplateBuilderModal extends Modal {
 		const form = contentEl.createDiv({ cls: "slasher-modal-grid" });
 		form.createEl("p", {
 			cls: "slasher-settings-help slasher-modal-helper-text",
-			text: "The helper inserts a starter snippet into the Template field. You can edit it freely afterwards.",
+			text: "The helper inserts a starter snippet into the template field. You can edit it freely afterwards.",
 		});
 
 		const dynamicSection = form.createDiv();
